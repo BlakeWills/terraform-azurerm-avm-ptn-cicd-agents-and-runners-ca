@@ -1,12 +1,10 @@
 variable "name" {
   type        = string
-  description = "The name of the this resource."
+  description = "Prefix used for naming the container app environment and container app jobs."
 
   validation {
-    condition     = can(regex("TODO", var.name))
-    error_message = "The name must be TODO." # TODO remove the example below once complete:
-    #condition     = can(regex("^[a-z0-9]{5,50}$", var.name))
-    #error_message = "The name must be between 5 and 50 characters long and can only contain lowercase letters and numbers."
+    condition     = length(var.name) <= 20
+    error_message = "Variable 'name' must be less than 20 characters due to container app job naming restrictions. '${var.name}' is ${length(var.name)} characters."
   }
 }
 
@@ -116,58 +114,6 @@ variable "managed_identities" {
   description = "Managed identities to be created for the resource."
 }
 
-variable "private_endpoints" {
-  type = map(object({
-    name = optional(string, null)
-    role_assignments = optional(map(object({
-      role_definition_id_or_name             = string
-      principal_id                           = string
-      description                            = optional(string, null)
-      skip_service_principal_aad_check       = optional(bool, false)
-      condition                              = optional(string, null)
-      condition_version                      = optional(string, null)
-      delegated_managed_identity_resource_id = optional(string, null)
-    })), {})
-    lock = optional(object({
-      name = optional(string, null)
-      kind = optional(string, "None")
-    }), {})
-    tags                                    = optional(map(any), null)
-    subnet_resource_id                      = string
-    private_dns_zone_group_name             = optional(string, "default")
-    private_dns_zone_resource_ids           = optional(set(string), [])
-    application_security_group_associations = optional(map(string), {})
-    private_service_connection_name         = optional(string, null)
-    network_interface_name                  = optional(string, null)
-    location                                = optional(string, null)
-    resource_group_name                     = optional(string, null)
-    ip_configurations = optional(map(object({
-      name               = string
-      private_ip_address = string
-    })), {})
-  }))
-  default     = {}
-  description = <<DESCRIPTION
-A map of private endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the private endpoint. One will be generated if not set.
-- `role_assignments` - (Optional) A map of role assignments to create on the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time. See `var.role_assignments` for more information.
-- `lock` - (Optional) The lock level to apply to the private endpoint. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
-- `tags` - (Optional) A mapping of tags to assign to the private endpoint.
-- `subnet_resource_id` - The resource ID of the subnet to deploy the private endpoint in.
-- `private_dns_zone_group_name` - (Optional) The name of the private DNS zone group. One will be generated if not set.
-- `private_dns_zone_resource_ids` - (Optional) A set of resource IDs of private DNS zones to associate with the private endpoint. If not set, no zone groups will be created and the private endpoint will not be associated with any private DNS zones. DNS records must be managed external to this module.
-- `application_security_group_resource_ids` - (Optional) A map of resource IDs of application security groups to associate with the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `private_service_connection_name` - (Optional) The name of the private service connection. One will be generated if not set.
-- `network_interface_name` - (Optional) The name of the network interface. One will be generated if not set.
-- `location` - (Optional) The Azure location where the resources will be deployed. Defaults to the location of the resource group.
-- `resource_group_name` - (Optional) The resource group where the resources will be deployed. Defaults to the resource group of this resource.
-- `ip_configurations` - (Optional) A map of IP configurations to create on the private endpoint. If not specified the platform will create one. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the IP configuration.
-  - `private_ip_address` - The private IP address of the IP configuration.
-DESCRIPTION
-}
-
 variable "role_assignments" {
   type = map(object({
     role_definition_id_or_name             = string
@@ -198,4 +144,175 @@ variable "tags" {
   type        = map(any)
   default     = {}
   description = "The map of tags to be applied to the resource"
+}
+
+variable "azp_url" {
+  type        = string
+  description = "URL for the Azure DevOps project."
+  nullable    = false
+}
+
+variable "azp_pool_name" {
+  type        = string
+  description = "Name of the pool that agents should register against in Azure DevOps."
+  nullable    = false
+}
+
+variable "container_image_name" {
+  type        = string
+  description = "Fully qualified name of the Docker image the agents should run."
+  nullable    = false
+}
+
+variable "container_registry_login_server" {
+  type        = string
+  description = "Login server url for the Azure Container Registry hosting the image."
+  nullable    = false
+}
+
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "Terraform Id of the Log Analytics Workspace to connect to the Container App Environment."
+  nullable    = true
+  default = null
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "The Terraform subnet id to deploy the container app environment into."
+  nullable    = false
+}
+
+variable "pat_token_secret_url" {
+  type        = string
+  description = <<DESCRIPTION
+The value of the personal access token the agents will use for authenticating to Azure DevOps.
+One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
+DESCRIPTION
+  nullable    = true
+  default = null
+}
+
+variable "pat_token_value" {
+  type        = string
+  description = <<DESCRIPTION
+The value of the personal access token the agents will use for authenticating to Azure DevOps.
+One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
+DESCRIPTION
+  nullable    = true
+  default = null
+}
+
+variable "polling_interval_seconds" {
+  type        = number
+  default     = 30
+  description = "How often should the pipeline queue be checked for new events, in seconds."
+}
+
+variable "min_execution_count" {
+  type        = number
+  default     = 0
+  description = "The minimum number of executions (ADO jobs) to spawn per polling interval."
+}
+
+variable "max_execution_count" {
+  type        = number
+  default     = 100
+  description = "The maximum number of executions (ADO jobs) to spawn per polling interval."
+}
+
+variable "target_pipeline_queue_length" {
+  type        = number
+  default     = 1
+  description = "The target number of jobs in the ADO pool queue."
+}
+
+variable "container_app_job_runner_name" {
+  type        = string
+  description = "The name of the Container App runner job."
+  default     = null
+}
+
+variable "container_app_job_placeholder_name" {
+  type        = string
+  description = "The name of the Container App placeholder job."
+  default     = null
+}
+
+variable "container_app_environment_name" {
+  type        = string
+  description = "The name of the Container App Environment."
+  default     = null
+}
+
+variable "key_vault_user_assigned_identity" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The user assigned identity to use to authenticate with Key Vault.
+Must be specified if multiple user assigned are specified in `managed_identities`.
+DESCRIPTION
+}
+
+variable "container_registry_user_assigned_identity" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The user assigned identity to use to authenticate with Azure container registry.
+Must be specified if multiple user assigned are specified in `managed_identities`.
+DESCRIPTION
+}
+
+variable "placeholder_replica_retry_limit" {
+  type        = number
+  default     = 0
+  description = "The number of times to retry the placeholder Container Apps job."
+}
+
+variable "runner_replica_retry_limit" {
+  type        = number
+  default     = 3
+  description = "The number of times to retry the runner Container Apps job."
+}
+
+variable "placeholder_replica_timeout" {
+  type        = number
+  default     = 300
+  description = "The timeout in seconds for the placeholder Container Apps job."
+}
+
+variable "runner_replica_timeout" {
+  type        = number
+  default     = 1800
+  description = "The timeout in seconds for the runner Container Apps job."
+}
+
+variable "placeholder_container_name" {
+  type        = string
+  default     = "ado-agent-linux"
+  description = "The name of the container for the placeholder Container Apps job."
+}
+
+variable "runner_container_name" {
+  type        = string
+  default     = "ado-agent-linux"
+  description = "The name of the container for the runner Container Apps job."
+}
+
+variable "placeholder_agent_name" {
+  type        = string
+  default     = "placeholder-agent"
+  description = "The name of the agent that will appear in Azure DevOps for the placeholder agent."
+}
+
+variable "runner_agent_cpu" {
+  type        = number
+  default     = 1.0
+  description = "Required CPU in cores, e.g. 0.5"
+}
+
+variable "runner_agent_memory" {
+  type        = string
+  default     = "2Gi"
+  description = "Required memory, e.g. '250Mb'"
 }

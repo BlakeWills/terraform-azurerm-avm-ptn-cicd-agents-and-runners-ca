@@ -1,3 +1,9 @@
+locals {
+  tags = {
+    scenario = "default"
+  }
+}
+
 terraform {
   required_version = ">= 1.3.0"
   required_providers {
@@ -43,15 +49,64 @@ resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
 }
 
+resource "azurerm_virtual_network" "this_vnet" {
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.virtual_network.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+}
+
+resource "azurerm_subnet" "this_subnet_1" {
+  address_prefixes     = ["10.0.2.0/23"]
+  name                 = "${module.naming.subnet.name_unique}-1"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this_vnet.name
+  service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Storage"]
+}
+
+resource "azurerm_user_assigned_identity" "example_identity" {
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.user_assigned_identity.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+}
+
+module "containerregistry" {
+  source              = "Azure/avm-res-containerregistry-registry/azurerm"
+  name                = module.naming.container_registry.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  role_assignments = {
+    acrpull = {
+      role_definition_id_or_name = "AcrPull"
+      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
+    }
+  }
+}
+
 # This is the module call
 # Do not specify location here due to the randomization above.
 # Leaving location as `null` will cause the module to use the resource group location
 # with a data source.
-module "test" {
-  source = "../../"
-  # source             = "Azure/avm-<res/ptn>-<name>/azurerm"
-  # ...
-  enable_telemetry    = var.enable_telemetry # see variables.tf
-  name                = "TODO"               # TODO update with module.naming.<RESOURCE_TYPE>.name_unique
+module "avm-ptn-cicd-agents-and-runners-ca" {
+  source = "../.."
+  # source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+
   resource_group_name = azurerm_resource_group.this.name
+
+  managed_identities = {
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+  }
+
+  name                 = "ca-adoagent"
+  azp_pool_name        = "ca-adoagent-pool"
+  azp_url              = "https://dev.azure.com/BJSSCloudLZs"
+  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+
+  subnet_id                       = azurerm_subnet.this_subnet_1.id
+  pat_token_value                 = var.personal_access_token
+  container_registry_login_server = module.containerregistry.resource.login_server
+
+  enable_telemetry    = var.enable_telemetry # see variables.tf
 }
