@@ -1,23 +1,182 @@
 <!-- BEGIN_TF_DOCS -->
-# terraform-azurerm-avm-template
+# terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca
 
-This is a template repo for Terraform Azure Verified Modules.
+This module is designed to deploy a self-hosted Azure DevOps agent using Azure Container Apps.
 
-Things to do:
+## Features
 
-1. Set up a GitHub repo environment called `test`.
-1. Configure environment protection rule to ensure that approval is required before deploying to this environment.
-1. Create a user-assigned managed identity in your test subscription.
-1. Create a role assignment for the managed identity on your test subscription, use the minimum required role.
-1. Configure federated identity credentials on the user assigned managed identity. Use the GitHub environment.
-1. Search and update TODOs within the code and remove the TODO comments once complete.
+- Container App Environment
+  - Consumer workload profile.
+  - PAT token authentication to Azure DevOps organization (Plain-text value or KeyVault secret URL)
+- Runner Job.
+  - Configurable auto-scaling based on Azure DevOps pipeline jobs.
+  - Configurable CPU and memory.
+- Placeholder Job.
 
-> [!IMPORTANT]
-> As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
->
-> All module **MUST** be published as a pre-release version (e.g., `0.1.0`, `0.1.1`, `0.2.0`, etc.) until the AVM framework becomes GA.
->
-> However, it is important to note that this **DOES NOT** mean that the modules cannot be consumed and utilized. They **CAN** be leveraged in all types of environments (dev, test, prod etc.). Consumers can treat them just like any other IaC module and raise issues or feature requests against them as they learn from the usage of the module. Consumers should also read the release notes for each version, if considering updating to a more recent version of a module to see if there are any considerations or breaking changes etc.
+## Example
+
+```hcl
+resource "azurerm_resource_group" "this" {
+  location = "uksouth"
+  name     = "ado-agents-aca-rg"
+}
+
+resource "azurerm_virtual_network" "this_vnet" {
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.this.location
+  name                = "ado-agents-vnet"
+  resource_group_name = azurerm_resource_group.this.name
+}
+
+resource "azurerm_user_assigned_identity" "example_identity" {
+  location            = azurerm_resource_group.this.location
+  name                = "ado-agents-mi"
+  resource_group_name = azurerm_resource_group.this.name
+}
+
+module "containerregistry" {
+  source              = "Azure/avm-res-containerregistry-registry/azurerm"
+  name                = module.naming.container_registry.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  role_assignments = {
+    acrpull = {
+      role_definition_id_or_name = "AcrPull"
+      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
+    }
+  }
+}
+
+module "avm-ptn-cicd-agents-and-runners-ca" {
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+
+  resource_group_name = azurerm_resource_group.this.name
+
+  managed_identities = {
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+  }
+
+  name                 = "ca-adoagent"
+  azp_pool_name        = "ca-adoagent-pool"
+  azp_url              = "https://dev.azure.com/my-organization"
+  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
+  pat_token_value                 = var.personal_access_token
+  container_registry_login_server = module.containerregistry.resource.login_server
+
+  enable_telemetry    = var.enable_telemetry # see variables.tf
+}
+```
+
+## Enable or Disable Tracing Tags
+
+We're using [BridgeCrew Yor](https://github.com/bridgecrewio/yor) and [yorbox](https://github.com/lonegunmanb/yorbox) to help manage tags consistently across infrastructure as code (IaC) frameworks. This adds accountability for the code responsible for deploying the particular Azure resources. In this module you might see tags like:
+
+```hcl
+resource "azurerm_container_app_environment" "ado_agent_container_app" {
+  name                           = coalesce(var.container_app_environment_name, "cae-${var.name}")
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  zone_redundancy_enabled        = true
+  infrastructure_subnet_id       = var.subnet_id
+  log_analytics_workspace_id     = var.log_analytics_workspace_id
+  internal_load_balancer_enabled = true
+
+  tags = merge(var.default_tags, var.route_table_tags, (/*<box>*/ (var.tracing_tags_enabled ? { for k, v in /*</box>*/ {
+    avm_git_commit           = "0978238465c76c23be1b5998c1451519b4d135c9"
+    avm_git_file             = "main.tf"
+    avm_git_last_modified_at = "2023-07-01 10:37:24"
+    avm_git_org              = "Azure"
+    avm_git_repo             = "terraform-azurerm-avm-ptn-vnetgateway"
+    avm_yor_name             = "vgw"
+    avm_yor_trace            = "89805148-c9e6-4736-96bc-0f4095dfb135"
+  } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/))
+}
+```
+
+To enable tracing tags, set the `tracing_tags_enabled` variable to true:
+
+```hcl
+module "avm-ptn-cicd-agents-and-runners-ca" {
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+
+  resource_group_name = azurerm_resource_group.this.name
+
+  managed_identities = {
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+  }
+
+  name                 = "ca-adoagent"
+  azp_pool_name        = "ca-adoagent-pool"
+  azp_url              = "https://dev.azure.com/my-organization"
+  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
+  pat_token_value                 = var.personal_access_token
+  container_registry_login_server = module.containerregistry.resource.login_server
+
+  enable_telemetry    = var.enable_telemetry # see variables.tf
+
+  tracing_tags_enabled = true
+}
+```
+
+The `tracing_tags_enabled` is defaulted to `false`.
+
+To customize the prefix for your tracing tags, set the `tracing_tags_prefix` variable value in your Terraform configuration:
+
+```hcl
+module "avm-ptn-cicd-agents-and-runners-ca" {
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+
+  resource_group_name = azurerm_resource_group.this.name
+
+  managed_identities = {
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+  }
+
+  name                 = "ca-adoagent"
+  azp_pool_name        = "ca-adoagent-pool"
+  azp_url              = "https://dev.azure.com/my-organization"
+  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
+  pat_token_value                 = var.personal_access_token
+  container_registry_login_server = module.containerregistry.resource.login_server
+
+  enable_telemetry    = var.enable_telemetry # see variables.tf
+
+  tracing_tags_enabled = true
+  tracing_tags_prefix  = "custom_prefix_"
+}
+```
+
+# TODO: Where do we get these from?
+The actual applied tags would be:
+
+```text
+{
+  custom_prefix_git_commit           = "0978238465c76c23be1b5998c1451519b4d135c9"
+  custom_prefix_git_file             = "main.tf"
+  custom_prefix_git_last_modified_at = "2023-07-01 10:37:24"
+  custom_prefix_git_org              = "Azure"
+  custom_prefix_git_repo             = "terraform-azurerm-avm-ptn-vnetgateway"
+  custom_prefix_yor_name             = "vgw"
+  custom_prefix_yor_trace            = "89805148-c9e6-4736-96bc-0f4095dfb135"
+}
+```
 
 <!-- markdownlint-disable MD033 -->
 ## Requirements
@@ -28,28 +187,31 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (>= 1.9.0, < 2.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 3.71)
 
-- <a name="requirement_random"></a> [random](#requirement\_random) (>= 3.5.0, < 4.0)
+- <a name="requirement_random"></a> [random](#requirement\_random) (~> 3.5)
 
 ## Providers
 
 The following providers are used by this module:
 
-- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0, < 4.0)
+- <a name="provider_azapi"></a> [azapi](#provider\_azapi) (>= 1.9.0, < 2.0)
 
-- <a name="provider_random"></a> [random](#provider\_random) (>= 3.5.0, < 4.0)
+- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (~> 3.71)
+
+- <a name="provider_random"></a> [random](#provider\_random) (~> 3.5)
 
 ## Resources
 
 The following resources are used by this module:
 
+- [azapi_resource.placeholder_job](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.runner_job](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azurerm_container_app_environment.ado_agent_container_app](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment) (resource)
 - [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_private_endpoint.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) (resource)
-- [azurerm_private_endpoint_application_security_group_association.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint_application_security_group_association) (resource)
-- [azurerm_resource_group.TODO](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
 - [azurerm_resource_group_template_deployment.telemetry](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group_template_deployment) (resource)
 - [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azurerm_subnet.ado_agents_subnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
 - [random_id.telem](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) (resource)
 - [azurerm_resource_group.parent](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) (data source)
 
@@ -58,9 +220,33 @@ The following resources are used by this module:
 
 The following input variables are required:
 
+### <a name="input_azp_pool_name"></a> [azp\_pool\_name](#input\_azp\_pool\_name)
+
+Description: Name of the pool that agents should register against in Azure DevOps.
+
+Type: `string`
+
+### <a name="input_azp_url"></a> [azp\_url](#input\_azp\_url)
+
+Description: URL for the Azure DevOps project.
+
+Type: `string`
+
+### <a name="input_container_image_name"></a> [container\_image\_name](#input\_container\_image\_name)
+
+Description: Fully qualified name of the Docker image the agents should run.
+
+Type: `string`
+
+### <a name="input_container_registry_login_server"></a> [container\_registry\_login\_server](#input\_container\_registry\_login\_server)
+
+Description: Login server url for the Azure Container Registry hosting the image.
+
+Type: `string`
+
 ### <a name="input_name"></a> [name](#input\_name)
 
-Description: The name of the this resource.
+Description: Prefix used for naming the container app environment and container app jobs.
 
 Type: `string`
 
@@ -70,9 +256,72 @@ Description: The resource group where the resources will be deployed.
 
 Type: `string`
 
+### <a name="input_subnet"></a> [subnet](#input\_subnet)
+
+Description: The configuration for the Container App Environment subnet.:
+- `name`: Name of the subnet.
+- `address_prefixes`: List of valid CIDR blocks for the subnet. A consumption plan Container App Environment requires a /23 or larger.
+- `service_endpoints`: An optional list of service endpoints to add to the subnet.
+
+Type:
+
+```hcl
+object({
+    name = optional(string)
+    address_prefixes = list(string)
+    service_endpoints = optional(list(string))
+  })
+```
+
+### <a name="input_virtual_network"></a> [virtual\_network](#input\_virtual\_network)
+
+Description: Object defining the virtual network the container app environment subnet should be created within.
+
+Type:
+
+```hcl
+object({
+    name = string
+    resource_group_name = string
+  })
+```
+
 ## Optional Inputs
 
 The following input variables are optional (have default values):
+
+### <a name="input_container_app_environment_name"></a> [container\_app\_environment\_name](#input\_container\_app\_environment\_name)
+
+Description: The name of the Container App Environment.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_container_app_job_placeholder_name"></a> [container\_app\_job\_placeholder\_name](#input\_container\_app\_job\_placeholder\_name)
+
+Description: The name of the Container App placeholder job.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_container_app_job_runner_name"></a> [container\_app\_job\_runner\_name](#input\_container\_app\_job\_runner\_name)
+
+Description: The name of the Container App runner job.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_container_registry_user_assigned_identity"></a> [container\_registry\_user\_assigned\_identity](#input\_container\_registry\_user\_assigned\_identity)
+
+Description: The user assigned identity to use to authenticate with Azure container registry.  
+Must be specified if multiple user assigned are specified in `managed_identities`.
+
+Type: `string`
+
+Default: `null`
 
 ### <a name="input_customer_managed_key"></a> [customer\_managed\_key](#input\_customer\_managed\_key)
 
@@ -135,6 +384,15 @@ Type: `bool`
 
 Default: `true`
 
+### <a name="input_key_vault_user_assigned_identity"></a> [key\_vault\_user\_assigned\_identity](#input\_key\_vault\_user\_assigned\_identity)
+
+Description: The user assigned identity to use to authenticate with Key Vault.  
+Must be specified if multiple user assigned are specified in `managed_identities`.
+
+Type: `string`
+
+Default: `null`
+
 ### <a name="input_location"></a> [location](#input\_location)
 
 Description: Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location.
@@ -158,6 +416,14 @@ object({
 
 Default: `{}`
 
+### <a name="input_log_analytics_workspace_id"></a> [log\_analytics\_workspace\_id](#input\_log\_analytics\_workspace\_id)
+
+Description: Terraform Id of the Log Analytics Workspace to connect to the Container App Environment.
+
+Type: `string`
+
+Default: `null`
+
 ### <a name="input_managed_identities"></a> [managed\_identities](#input\_managed\_identities)
 
 Description: Managed identities to be created for the resource.
@@ -173,61 +439,79 @@ object({
 
 Default: `{}`
 
-### <a name="input_private_endpoints"></a> [private\_endpoints](#input\_private\_endpoints)
+### <a name="input_max_execution_count"></a> [max\_execution\_count](#input\_max\_execution\_count)
 
-Description: A map of private endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description: The maximum number of executions (ADO jobs) to spawn per polling interval.
 
-- `name` - (Optional) The name of the private endpoint. One will be generated if not set.
-- `role_assignments` - (Optional) A map of role assignments to create on the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time. See `var.role_assignments` for more information.
-- `lock` - (Optional) The lock level to apply to the private endpoint. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`.
-- `tags` - (Optional) A mapping of tags to assign to the private endpoint.
-- `subnet_resource_id` - The resource ID of the subnet to deploy the private endpoint in.
-- `private_dns_zone_group_name` - (Optional) The name of the private DNS zone group. One will be generated if not set.
-- `private_dns_zone_resource_ids` - (Optional) A set of resource IDs of private DNS zones to associate with the private endpoint. If not set, no zone groups will be created and the private endpoint will not be associated with any private DNS zones. DNS records must be managed external to this module.
-- `application_security_group_resource_ids` - (Optional) A map of resource IDs of application security groups to associate with the private endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `private_service_connection_name` - (Optional) The name of the private service connection. One will be generated if not set.
-- `network_interface_name` - (Optional) The name of the network interface. One will be generated if not set.
-- `location` - (Optional) The Azure location where the resources will be deployed. Defaults to the location of the resource group.
-- `resource_group_name` - (Optional) The resource group where the resources will be deployed. Defaults to the resource group of this resource.
-- `ip_configurations` - (Optional) A map of IP configurations to create on the private endpoint. If not specified the platform will create one. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the IP configuration.
-  - `private_ip_address` - The private IP address of the IP configuration.
+Type: `number`
 
-Type:
+Default: `100`
 
-```hcl
-map(object({
-    name = optional(string, null)
-    role_assignments = optional(map(object({
-      role_definition_id_or_name             = string
-      principal_id                           = string
-      description                            = optional(string, null)
-      skip_service_principal_aad_check       = optional(bool, false)
-      condition                              = optional(string, null)
-      condition_version                      = optional(string, null)
-      delegated_managed_identity_resource_id = optional(string, null)
-    })), {})
-    lock = optional(object({
-      name = optional(string, null)
-      kind = optional(string, "None")
-    }), {})
-    tags                                    = optional(map(any), null)
-    subnet_resource_id                      = string
-    private_dns_zone_group_name             = optional(string, "default")
-    private_dns_zone_resource_ids           = optional(set(string), [])
-    application_security_group_associations = optional(map(string), {})
-    private_service_connection_name         = optional(string, null)
-    network_interface_name                  = optional(string, null)
-    location                                = optional(string, null)
-    resource_group_name                     = optional(string, null)
-    ip_configurations = optional(map(object({
-      name               = string
-      private_ip_address = string
-    })), {})
-  }))
-```
+### <a name="input_min_execution_count"></a> [min\_execution\_count](#input\_min\_execution\_count)
 
-Default: `{}`
+Description: The minimum number of executions (ADO jobs) to spawn per polling interval.
+
+Type: `number`
+
+Default: `0`
+
+### <a name="input_pat_token_secret_url"></a> [pat\_token\_secret\_url](#input\_pat\_token\_secret\_url)
+
+Description: The value of the personal access token the agents will use for authenticating to Azure DevOps.  
+One of 'pat\_token\_value' or 'pat\_token\_secret\_url' must be specified.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_pat_token_value"></a> [pat\_token\_value](#input\_pat\_token\_value)
+
+Description: The value of the personal access token the agents will use for authenticating to Azure DevOps.  
+One of 'pat\_token\_value' or 'pat\_token\_secret\_url' must be specified.
+
+Type: `string`
+
+Default: `null`
+
+### <a name="input_placeholder_agent_name"></a> [placeholder\_agent\_name](#input\_placeholder\_agent\_name)
+
+Description: The name of the agent that will appear in Azure DevOps for the placeholder agent.
+
+Type: `string`
+
+Default: `"placeholder-agent"`
+
+### <a name="input_placeholder_container_name"></a> [placeholder\_container\_name](#input\_placeholder\_container\_name)
+
+Description: The name of the container for the placeholder Container Apps job.
+
+Type: `string`
+
+Default: `"ado-agent-linux"`
+
+### <a name="input_placeholder_replica_retry_limit"></a> [placeholder\_replica\_retry\_limit](#input\_placeholder\_replica\_retry\_limit)
+
+Description: The number of times to retry the placeholder Container Apps job.
+
+Type: `number`
+
+Default: `0`
+
+### <a name="input_placeholder_replica_timeout"></a> [placeholder\_replica\_timeout](#input\_placeholder\_replica\_timeout)
+
+Description: The timeout in seconds for the placeholder Container Apps job.
+
+Type: `number`
+
+Default: `300`
+
+### <a name="input_polling_interval_seconds"></a> [polling\_interval\_seconds](#input\_polling\_interval\_seconds)
+
+Description: How often should the pipeline queue be checked for new events, in seconds.
+
+Type: `number`
+
+Default: `30`
 
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
@@ -258,6 +542,46 @@ map(object({
 
 Default: `{}`
 
+### <a name="input_runner_agent_cpu"></a> [runner\_agent\_cpu](#input\_runner\_agent\_cpu)
+
+Description: Required CPU in cores, e.g. 0.5
+
+Type: `number`
+
+Default: `1`
+
+### <a name="input_runner_agent_memory"></a> [runner\_agent\_memory](#input\_runner\_agent\_memory)
+
+Description: Required memory, e.g. '250Mb'
+
+Type: `string`
+
+Default: `"2Gi"`
+
+### <a name="input_runner_container_name"></a> [runner\_container\_name](#input\_runner\_container\_name)
+
+Description: The name of the container for the runner Container Apps job.
+
+Type: `string`
+
+Default: `"ado-agent-linux"`
+
+### <a name="input_runner_replica_retry_limit"></a> [runner\_replica\_retry\_limit](#input\_runner\_replica\_retry\_limit)
+
+Description: The number of times to retry the runner Container Apps job.
+
+Type: `number`
+
+Default: `3`
+
+### <a name="input_runner_replica_timeout"></a> [runner\_replica\_timeout](#input\_runner\_replica\_timeout)
+
+Description: The timeout in seconds for the runner Container Apps job.
+
+Type: `number`
+
+Default: `1800`
+
 ### <a name="input_tags"></a> [tags](#input\_tags)
 
 Description: The map of tags to be applied to the resource
@@ -266,17 +590,29 @@ Type: `map(any)`
 
 Default: `{}`
 
+### <a name="input_target_pipeline_queue_length"></a> [target\_pipeline\_queue\_length](#input\_target\_pipeline\_queue\_length)
+
+Description: The target number of jobs in the ADO pool queue.
+
+Type: `number`
+
+Default: `1`
+
 ## Outputs
 
 The following outputs are exported:
 
-### <a name="output_private_endpoints"></a> [private\_endpoints](#output\_private\_endpoints)
-
-Description: A map of private endpoints. The map key is the supplied input to var.private\_endpoints. The map value is the entire azurerm\_private\_endpoint resource.
-
 ### <a name="output_resource"></a> [resource](#output\_resource)
 
-Description: This is the full output for the resource.
+Description: The container app environment.
+
+### <a name="output_resource_placeholder_job"></a> [resource\_placeholder\_job](#output\_resource\_placeholder\_job)
+
+Description: The placeholder job.
+
+### <a name="output_resource_runner_job"></a> [resource\_runner\_job](#output\_resource\_runner\_job)
+
+Description: The runner job.
 
 ## Modules
 
