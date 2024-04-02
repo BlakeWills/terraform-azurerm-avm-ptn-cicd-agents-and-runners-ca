@@ -27,13 +27,6 @@ resource "azurerm_virtual_network" "this_vnet" {
   resource_group_name = azurerm_resource_group.this.name
 }
 
-resource "azurerm_subnet" "this_subnet_1" {
-  address_prefixes     = ["10.0.2.0/23"]
-  name                 = "ado-agents-subnet"
-  resource_group_name  = azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this_vnet.name
-}
-
 resource "azurerm_user_assigned_identity" "example_identity" {
   location            = azurerm_resource_group.this.location
   name                = "ado-agents-mi"
@@ -67,7 +60,10 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   azp_url              = "https://dev.azure.com/my-organization"
   container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
 
-  subnet_id                       = azurerm_subnet.this_subnet_1.id
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
@@ -119,7 +115,10 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   azp_url              = "https://dev.azure.com/my-organization"
   container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
 
-  subnet_id                       = azurerm_subnet.this_subnet_1.id
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
@@ -149,7 +148,10 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   azp_url              = "https://dev.azure.com/my-organization"
   container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
 
-  subnet_id                       = azurerm_subnet.this_subnet_1.id
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 

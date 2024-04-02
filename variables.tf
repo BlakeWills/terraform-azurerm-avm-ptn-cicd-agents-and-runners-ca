@@ -177,10 +177,26 @@ variable "log_analytics_workspace_id" {
   default = null
 }
 
-variable "subnet_id" {
-  type        = string
-  description = "The Terraform subnet id to deploy the container app environment into."
-  nullable    = false
+variable "virtual_network" {
+  type = object({
+    name = string
+    resource_group_name = string
+  })
+  description = "Object defining the virtual network the container app environment subnet should be created within."
+}
+
+variable "subnet" {
+  type = object({
+    name = optional(string)
+    address_prefixes = list(string)
+    service_endpoints = optional(list(string))
+  })
+  description = <<DESCRIPTION
+The configuration for the Container App Environment subnet.:
+- `name`: Name of the subnet.
+- `address_prefixes`: List of valid CIDR blocks for the subnet. A consumption plan Container App Environment requires a /23 or larger.
+- `service_endpoints`: An optional list of service endpoints to add to the subnet.
+DESCRIPTION
 }
 
 variable "pat_token_secret_url" {

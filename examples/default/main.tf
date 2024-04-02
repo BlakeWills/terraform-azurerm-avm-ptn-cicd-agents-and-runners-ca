@@ -43,7 +43,6 @@ module "naming" {
   version = ">= 0.3.0"
 }
 
-# This is required for resource modules
 resource "azurerm_resource_group" "this" {
   location = module.regions.regions[random_integer.region_index.result].name
   name     = module.naming.resource_group.name_unique
@@ -55,14 +54,6 @@ resource "azurerm_virtual_network" "this_vnet" {
   name                = module.naming.virtual_network.name_unique
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
-}
-
-resource "azurerm_subnet" "this_subnet_1" {
-  address_prefixes     = ["10.0.2.0/23"]
-  name                 = "${module.naming.subnet.name_unique}-1"
-  resource_group_name  = azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this_vnet.name
-  service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Storage"]
 }
 
 resource "azurerm_user_assigned_identity" "example_identity" {
@@ -104,7 +95,11 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   azp_url              = "https://dev.azure.com/BJSSCloudLZs"
   container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
 
-  subnet_id                       = azurerm_subnet.this_subnet_1.id
+  virtual_network = azurerm_virtual_network.this_vnet
+  subnet = {
+    address_prefixes = [ "10.0.2.0/23" ]
+  }
+  
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
