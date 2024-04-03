@@ -108,7 +108,7 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
     system_assigned = true
   }
 
-  name                            = "ca-adoagent"
+  name                            = module.naming.container_app.name_unique
   azp_pool_name                   = "ca-adoagent-pool"
   azp_url                         = var.ado_organization_url
   pat_token_value                 = var.personal_access_token
