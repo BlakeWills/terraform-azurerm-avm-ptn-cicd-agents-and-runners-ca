@@ -30,6 +30,12 @@ resource "azurerm_log_analytics_workspace" "this_workspace" {
   sku                 = "PerGB2018"
 }
 
+resource "azurerm_user_assigned_identity" "this_identity" {
+  location            = azurerm_resource_group.this.location
+  name                = "ado-agents-mi"
+  resource_group_name = azurerm_resource_group.this.name
+}
+
 resource "azurerm_virtual_network" "this_vnet" {
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.this.location
@@ -42,14 +48,9 @@ module "containerregistry" {
   name                = "ado-agents-acr"
   resource_group_name = azurerm_resource_group.this.name
   role_assignments = {
-    acrpull_placeholder = {
+    acrpull = {
       role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_placeholder_job.identity[0].principal_id
-    }
-
-    acrpull_runner = {
-      role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_runner_job.identity[0].principal_id
+      principal_id               = azurerm_user_assigned_identity.this_identity.principal_id
     }
   }
 }
@@ -72,7 +73,8 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned = true
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.this_identity.id]
   }
 
   name                            = "ca-adoagent"
@@ -128,7 +130,8 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned = true
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
   }
 
   name                                = module.naming.container_app.name_unique
@@ -161,7 +164,8 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned = true
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
   }
 
   name                                = module.naming.container_app.name_unique

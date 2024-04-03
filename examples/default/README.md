@@ -64,6 +64,13 @@ resource "azurerm_log_analytics_workspace" "this_workspace" {
   tags                = local.tags
 }
 
+resource "azurerm_user_assigned_identity" "this_identity" {
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.user_assigned_identity.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+}
+
 resource "azurerm_virtual_network" "this_vnet" {
   address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.this.location
@@ -77,14 +84,9 @@ module "containerregistry" {
   name                = module.naming.container_registry.name_unique
   resource_group_name = azurerm_resource_group.this.name
   role_assignments = {
-    acrpull_placeholder = {
+    acrpull = {
       role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_placeholder_job.identity[0].principal_id
-    }
-
-    acrpull_runner = {
-      role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_runner_job.identity[0].principal_id
+      principal_id               = azurerm_user_assigned_identity.this_identity.principal_id
     }
   }
 }
@@ -111,7 +113,8 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned = true
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.this_identity.id]
   }
 
   name                                = module.naming.container_app.name_unique
@@ -157,6 +160,7 @@ The following resources are used by this module:
 
 - [azurerm_log_analytics_workspace.this_workspace](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/log_analytics_workspace) (resource)
 - [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
+- [azurerm_user_assigned_identity.this_identity](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) (resource)
 - [azurerm_virtual_network.this_vnet](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
 - [random_integer.region_index](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/integer) (resource)
 - [terraform_data.agent_container_image](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
