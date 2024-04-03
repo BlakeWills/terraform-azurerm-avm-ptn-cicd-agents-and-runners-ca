@@ -1,3 +1,27 @@
+variable "azp_pool_name" {
+  type        = string
+  description = "Name of the pool that agents should register against in Azure DevOps."
+  nullable    = false
+}
+
+variable "azp_url" {
+  type        = string
+  description = "URL for the Azure DevOps project."
+  nullable    = false
+}
+
+variable "container_image_name" {
+  type        = string
+  description = "Fully qualified name of the Docker image the agents should run."
+  nullable    = false
+}
+
+variable "container_registry_login_server" {
+  type        = string
+  description = "Login server url for the Azure Container Registry hosting the image."
+  nullable    = false
+}
+
 variable "name" {
   type        = string
   description = "Prefix used for naming the container app environment and container app jobs."
@@ -14,8 +38,42 @@ variable "resource_group_name" {
   description = "The resource group where the resources will be deployed."
 }
 
-# required AVM interfaces
-# tflint-ignore: terraform_unused_declarations
+variable "virtual_network_name" {
+  type        = string
+  description = "The name of the Virtual Network."
+}
+
+variable "virtual_network_resource_group_name" {
+  type        = string
+  description = "The name of the Virtual Network's Resource Group."
+}
+
+variable "container_app_environment_name" {
+  type        = string
+  default     = null
+  description = "The name of the Container App Environment."
+}
+
+variable "container_app_job_placeholder_name" {
+  type        = string
+  default     = null
+  description = "The name of the Container App placeholder job."
+}
+
+variable "container_app_job_runner_name" {
+  type        = string
+  default     = null
+  description = "The name of the Container App runner job."
+}
+
+variable "container_registry_user_assigned_identity" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The user assigned identity to use to authenticate with Azure container registry.
+Must be specified if multiple user assigned are specified in `managed_identities`.
+DESCRIPTION
+}
 
 variable "enable_telemetry" {
   type        = bool
@@ -24,6 +82,15 @@ variable "enable_telemetry" {
 This variable controls whether or not telemetry is enabled for the module.
 For more information see <https://aka.ms/avm/telemetryinfo>.
 If it is set to false, then no telemetry will be collected.
+DESCRIPTION
+}
+
+variable "key_vault_user_assigned_identity" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The user assigned identity to use to authenticate with Key Vault.
+Must be specified if multiple user assigned are specified in `managed_identities`.
 DESCRIPTION
 }
 
@@ -48,6 +115,12 @@ variable "lock" {
   }
 }
 
+variable "log_analytics_workspace_id" {
+  type        = string
+  default     = null
+  description = "Terraform Id of the Log Analytics Workspace to connect to the Container App Environment."
+}
+
 # tflint-ignore: terraform_unused_declarations
 variable "managed_identities" {
   type = object({
@@ -56,6 +129,66 @@ variable "managed_identities" {
   })
   default     = {}
   description = "Managed identities to be created for the resource."
+}
+
+variable "max_execution_count" {
+  type        = number
+  default     = 100
+  description = "The maximum number of executions (ADO jobs) to spawn per polling interval."
+}
+
+variable "min_execution_count" {
+  type        = number
+  default     = 0
+  description = "The minimum number of executions (ADO jobs) to spawn per polling interval."
+}
+
+variable "pat_token_secret_url" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The value of the personal access token the agents will use for authenticating to Azure DevOps.
+One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
+DESCRIPTION
+}
+
+variable "pat_token_value" {
+  type        = string
+  default     = null
+  description = <<DESCRIPTION
+The value of the personal access token the agents will use for authenticating to Azure DevOps.
+One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
+DESCRIPTION
+}
+
+variable "placeholder_agent_name" {
+  type        = string
+  default     = "placeholder-agent"
+  description = "The name of the agent that will appear in Azure DevOps for the placeholder agent."
+}
+
+variable "placeholder_container_name" {
+  type        = string
+  default     = "ado-agent-linux"
+  description = "The name of the container for the placeholder Container Apps job."
+}
+
+variable "placeholder_replica_retry_limit" {
+  type        = number
+  default     = 0
+  description = "The number of times to retry the placeholder Container Apps job."
+}
+
+variable "placeholder_replica_timeout" {
+  type        = number
+  default     = 300
+  description = "The timeout in seconds for the placeholder Container Apps job."
+}
+
+variable "polling_interval_seconds" {
+  type        = number
+  default     = 30
+  description = "How often should the pipeline queue be checked for new events, in seconds."
 }
 
 variable "role_assignments" {
@@ -83,59 +216,34 @@ A map of role assignments to create on this resource. The map key is deliberatel
 DESCRIPTION
 }
 
-# tflint-ignore: terraform_unused_declarations
-variable "tags" {
-  type        = map(any)
-  default     = {}
-  description = "The map of tags to be applied to the resource"
+variable "runner_agent_cpu" {
+  type        = number
+  default     = 1.0
+  description = "Required CPU in cores, e.g. 0.5"
 }
 
-variable "azp_url" {
+variable "runner_agent_memory" {
   type        = string
-  description = "URL for the Azure DevOps project."
-  nullable    = false
+  default     = "2Gi"
+  description = "Required memory, e.g. '250Mb'"
 }
 
-variable "azp_pool_name" {
+variable "runner_container_name" {
   type        = string
-  description = "Name of the pool that agents should register against in Azure DevOps."
-  nullable    = false
+  default     = "ado-agent-linux"
+  description = "The name of the container for the runner Container Apps job."
 }
 
-variable "container_image_name" {
-  type        = string
-  description = "Fully qualified name of the Docker image the agents should run."
-  nullable    = false
+variable "runner_replica_retry_limit" {
+  type        = number
+  default     = 3
+  description = "The number of times to retry the runner Container Apps job."
 }
 
-variable "container_registry_login_server" {
-  type        = string
-  description = "Login server url for the Azure Container Registry hosting the image."
-  nullable    = false
-}
-
-variable "log_analytics_workspace_id" {
-  type        = string
-  description = "Terraform Id of the Log Analytics Workspace to connect to the Container App Environment."
-  nullable    = true
-  default = null
-}
-
-variable "virtual_network_name" {
-  type        = string
-  description = "The name of the Virtual Network."
-}
-
-variable "virtual_network_resource_group_name" {
-  type        = string
-  description = "The name of the Virtual Network's Resource Group."
-}
-
-variable "subnet_name" {
-  type        = string
-  default     = ""
-  description = "The subnet name for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
-  nullable    = false
+variable "runner_replica_timeout" {
+  type        = number
+  default     = 1800
+  description = "The timeout in seconds for the runner Container Apps job."
 }
 
 variable "subnet_address_prefix" {
@@ -159,136 +267,22 @@ variable "subnet_id" {
   nullable    = false
 }
 
-variable "pat_token_secret_url" {
+variable "subnet_name" {
   type        = string
-  description = <<DESCRIPTION
-The value of the personal access token the agents will use for authenticating to Azure DevOps.
-One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
-DESCRIPTION
-  nullable    = true
-  default = null
+  default     = ""
+  description = "The subnet name for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
+  nullable    = false
 }
 
-variable "pat_token_value" {
-  type        = string
-  description = <<DESCRIPTION
-The value of the personal access token the agents will use for authenticating to Azure DevOps.
-One of 'pat_token_value' or 'pat_token_secret_url' must be specified.
-DESCRIPTION
-  nullable    = true
-  default = null
-}
-
-variable "polling_interval_seconds" {
-  type        = number
-  default     = 30
-  description = "How often should the pipeline queue be checked for new events, in seconds."
-}
-
-variable "min_execution_count" {
-  type        = number
-  default     = 0
-  description = "The minimum number of executions (ADO jobs) to spawn per polling interval."
-}
-
-variable "max_execution_count" {
-  type        = number
-  default     = 100
-  description = "The maximum number of executions (ADO jobs) to spawn per polling interval."
+# tflint-ignore: terraform_unused_declarations
+variable "tags" {
+  type        = map(any)
+  default     = {}
+  description = "The map of tags to be applied to the resource"
 }
 
 variable "target_pipeline_queue_length" {
   type        = number
   default     = 1
   description = "The target number of jobs in the ADO pool queue."
-}
-
-variable "container_app_job_runner_name" {
-  type        = string
-  description = "The name of the Container App runner job."
-  default     = null
-}
-
-variable "container_app_job_placeholder_name" {
-  type        = string
-  description = "The name of the Container App placeholder job."
-  default     = null
-}
-
-variable "container_app_environment_name" {
-  type        = string
-  description = "The name of the Container App Environment."
-  default     = null
-}
-
-variable "key_vault_user_assigned_identity" {
-  type        = string
-  default     = null
-  description = <<DESCRIPTION
-The user assigned identity to use to authenticate with Key Vault.
-Must be specified if multiple user assigned are specified in `managed_identities`.
-DESCRIPTION
-}
-
-variable "container_registry_user_assigned_identity" {
-  type        = string
-  default     = null
-  description = <<DESCRIPTION
-The user assigned identity to use to authenticate with Azure container registry.
-Must be specified if multiple user assigned are specified in `managed_identities`.
-DESCRIPTION
-}
-
-variable "placeholder_replica_retry_limit" {
-  type        = number
-  default     = 0
-  description = "The number of times to retry the placeholder Container Apps job."
-}
-
-variable "runner_replica_retry_limit" {
-  type        = number
-  default     = 3
-  description = "The number of times to retry the runner Container Apps job."
-}
-
-variable "placeholder_replica_timeout" {
-  type        = number
-  default     = 300
-  description = "The timeout in seconds for the placeholder Container Apps job."
-}
-
-variable "runner_replica_timeout" {
-  type        = number
-  default     = 1800
-  description = "The timeout in seconds for the runner Container Apps job."
-}
-
-variable "placeholder_container_name" {
-  type        = string
-  default     = "ado-agent-linux"
-  description = "The name of the container for the placeholder Container Apps job."
-}
-
-variable "runner_container_name" {
-  type        = string
-  default     = "ado-agent-linux"
-  description = "The name of the container for the runner Container Apps job."
-}
-
-variable "placeholder_agent_name" {
-  type        = string
-  default     = "placeholder-agent"
-  description = "The name of the agent that will appear in Azure DevOps for the placeholder agent."
-}
-
-variable "runner_agent_cpu" {
-  type        = number
-  default     = 1.0
-  description = "Required CPU in cores, e.g. 0.5"
-}
-
-variable "runner_agent_memory" {
-  type        = string
-  default     = "2Gi"
-  description = "Required memory, e.g. '250Mb'"
 }

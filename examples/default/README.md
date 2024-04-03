@@ -51,6 +51,7 @@ module "naming" {
 resource "azurerm_resource_group" "this" {
   location = module.regions.regions[random_integer.region_index.result].name
   name     = module.naming.resource_group.name_unique
+  tags     = local.tags
 }
 
 # Not required, but useful for checking execution logs.

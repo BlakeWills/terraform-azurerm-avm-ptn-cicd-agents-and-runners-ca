@@ -10,8 +10,6 @@ locals {
   }
 }
 
-data "azurerm_client_config" "this" {}
-
 terraform {
   required_version = ">= 1.3.0"
   required_providers {
@@ -29,6 +27,8 @@ terraform {
 provider "azurerm" {
   features {}
 }
+
+data "azurerm_client_config" "this" {}
 
 ## Section to provide a random Azure region for the resource group
 # This allows us to randomize the region for the resource group.
@@ -53,6 +53,7 @@ module "naming" {
 resource "azurerm_resource_group" "this" {
   location = module.regions.regions[random_integer.region_index.result].name
   name     = module.naming.resource_group.name_unique
+  tags     = local.tags
 }
 
 # Not required, but useful for checking execution logs.

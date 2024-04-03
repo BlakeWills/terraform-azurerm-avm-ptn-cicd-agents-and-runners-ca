@@ -3,7 +3,6 @@ output "resource" {
   value       = azurerm_container_app_environment.ado_agent_container_app
 }
 
-
 output "resource_placeholder_job" {
   description = "The placeholder job."
   value       = azapi_resource.placeholder_job
