@@ -114,21 +114,19 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
     system_assigned = true
   }
 
-  name                            = "ca-adoagent"
-  azp_pool_name                   = "ca-adoagent-pool"
-  azp_url                         = var.ado_organization_url
-  pat_token_value                 = var.personal_access_token
-  container_image_name            = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
-  log_analytics_workspace_id      = azurerm_log_analytics_workspace.this_workspace.id
-  container_registry_login_server = module.containerregistry.resource.login_server
-
+  name                                = module.naming.container_app.name_unique
+  azp_pool_name                       = "ca-adoagent-pool"
+  azp_url                             = var.ado_organization_url
+  pat_token_value                     = var.personal_access_token
+  container_image_name                = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
+  log_analytics_workspace_id          = azurerm_log_analytics_workspace.this_workspace.id
+  container_registry_login_server     = module.containerregistry.resource.login_server
   virtual_network_name                = azurerm_virtual_network.this_vnet.name
   virtual_network_resource_group_name = azurerm_virtual_network.this_vnet.resource_group_name
   subnet_address_prefix               = "10.0.2.0/23"
 
+  depends_on       = [terraform_data.agent_container_image]
   enable_telemetry = var.enable_telemetry # see variables.tf
-
-  depends_on = [terraform_data.agent_container_image]
 }
 ```
 

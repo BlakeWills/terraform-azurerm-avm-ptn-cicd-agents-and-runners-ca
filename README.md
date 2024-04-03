@@ -18,7 +18,7 @@ This module is designed to deploy a self-hosted Azure DevOps agent using Azure C
 ```hcl
 resource "azurerm_resource_group" "rg" {
   location = "uksouth"
-  name     = "ado-agents-aca-rg"
+  name     = "ado-agents-rg"
 }
 
 # Not required, but useful for checking execution logs.
@@ -99,23 +99,22 @@ We're using [BridgeCrew Yor](https://github.com/bridgecrewio/yor) and [yorbox](h
 
 ```hcl
 resource "azurerm_container_app_environment" "ado_agent_container_app" {
+  location                       = data.azurerm_resource_group.parent.location
   name                           = coalesce(var.container_app_environment_name, "cae-${var.name}")
-  location                       = var.location
   resource_group_name            = var.resource_group_name
-  zone_redundancy_enabled        = true
-  infrastructure_subnet_id       = var.subnet_id
-  log_analytics_workspace_id     = var.log_analytics_workspace_id
+  infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
   internal_load_balancer_enabled = true
-
-  tags = merge(var.default_tags, var.route_table_tags, (/*<box>*/ (var.tracing_tags_enabled ? { for k, v in /*</box>*/ {
-    avm_git_commit           = "0978238465c76c23be1b5998c1451519b4d135c9"
+  log_analytics_workspace_id     = var.log_analytics_workspace_id
+  tags = (/*<box>*/ (var.tracing_tags_enabled ? { for k, v in /*</box>*/ {
+    avm_git_commit           = "f2507b14218314d1fc8ce045727dcec2a1a80398"
     avm_git_file             = "main.tf"
-    avm_git_last_modified_at = "2023-07-01 10:37:24"
-    avm_git_org              = "Azure"
-    avm_git_repo             = "terraform-azurerm-avm-ptn-vnetgateway"
-    avm_yor_name             = "vgw"
-    avm_yor_trace            = "89805148-c9e6-4736-96bc-0f4095dfb135"
-  } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/))
+    avm_git_last_modified_at = "2024-04-03 13:55:59"
+    avm_git_org              = "BlakeWills"
+    avm_git_repo             = "terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
+    avm_yor_name             = "ado_agent_container_app"
+    avm_yor_trace            = "e81b70e5-cfe9-4918-9685-57bc900c0d68"
+  } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/)
+  zone_redundancy_enabled = true
 }
 ```
 
@@ -123,27 +122,27 @@ To enable tracing tags, set the `tracing_tags_enabled` variable to true:
 
 ```hcl
 module "avm-ptn-cicd-agents-and-runners-ca" {
-  source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  source = "../.."
+  # source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
 
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned            = false
-    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+    system_assigned = true
   }
 
-  name                 = "ca-adoagent"
-  azp_pool_name        = "ca-adoagent-pool"
-  azp_url              = "https://dev.azure.com/my-organization"
-  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+  name                                = module.naming.container_app.name_unique
+  azp_pool_name                       = "ca-adoagent-pool"
+  azp_url                             = var.ado_organization_url
+  pat_token_value                     = var.personal_access_token
+  container_image_name                = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
+  log_analytics_workspace_id          = azurerm_log_analytics_workspace.this_workspace.id
+  container_registry_login_server     = module.containerregistry.resource.login_server
+  virtual_network_name                = azurerm_virtual_network.this_vnet.name
+  virtual_network_resource_group_name = azurerm_virtual_network.this_vnet.resource_group_name
+  subnet_address_prefix               = "10.0.2.0/23"
 
-  virtual_network = azurerm_virtual_network.this_vnet
-  subnet = {
-    address_prefixes = ["10.0.2.0/23"]
-  }
-  pat_token_value                 = var.personal_access_token
-  container_registry_login_server = module.containerregistry.resource.login_server
-
+  depends_on       = [terraform_data.agent_container_image]
   enable_telemetry = var.enable_telemetry # see variables.tf
 
   tracing_tags_enabled = true
@@ -156,27 +155,27 @@ To customize the prefix for your tracing tags, set the `tracing_tags_prefix` var
 
 ```hcl
 module "avm-ptn-cicd-agents-and-runners-ca" {
-  source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  source = "../.."
+  # source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
 
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned            = false
-    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+    system_assigned = true
   }
 
-  name                 = "ca-adoagent"
-  azp_pool_name        = "ca-adoagent-pool"
-  azp_url              = "https://dev.azure.com/my-organization"
-  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
+  name                                = module.naming.container_app.name_unique
+  azp_pool_name                       = "ca-adoagent-pool"
+  azp_url                             = var.ado_organization_url
+  pat_token_value                     = var.personal_access_token
+  container_image_name                = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
+  log_analytics_workspace_id          = azurerm_log_analytics_workspace.this_workspace.id
+  container_registry_login_server     = module.containerregistry.resource.login_server
+  virtual_network_name                = azurerm_virtual_network.this_vnet.name
+  virtual_network_resource_group_name = azurerm_virtual_network.this_vnet.resource_group_name
+  subnet_address_prefix               = "10.0.2.0/23"
 
-  virtual_network = azurerm_virtual_network.this_vnet
-  subnet = {
-    address_prefixes = ["10.0.2.0/23"]
-  }
-  pat_token_value                 = var.personal_access_token
-  container_registry_login_server = module.containerregistry.resource.login_server
-
+  depends_on       = [terraform_data.agent_container_image]
   enable_telemetry = var.enable_telemetry # see variables.tf
 
   tracing_tags_enabled = true
