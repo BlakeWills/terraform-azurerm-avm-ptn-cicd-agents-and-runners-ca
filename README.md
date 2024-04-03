@@ -16,9 +16,18 @@ This module is designed to deploy a self-hosted Azure DevOps agent using Azure C
 ## Example
 
 ```hcl
-resource "azurerm_resource_group" "this" {
+resource "azurerm_resource_group" "rg" {
   location = "uksouth"
   name     = "ado-agents-aca-rg"
+}
+
+# Not required, but useful for checking execution logs.
+resource "azurerm_log_analytics_workspace" "this_workspace" {
+  location            = azurerm_resource_group.this.location
+  name                = "ado-agents-laws"
+  resource_group_name = azurerm_resource_group.this.name
+  retention_in_days   = 30
+  sku                 = "PerGB2018"
 }
 
 resource "azurerm_virtual_network" "this_vnet" {
@@ -28,47 +37,59 @@ resource "azurerm_virtual_network" "this_vnet" {
   resource_group_name = azurerm_resource_group.this.name
 }
 
-resource "azurerm_user_assigned_identity" "example_identity" {
-  location            = azurerm_resource_group.this.location
-  name                = "ado-agents-mi"
-  resource_group_name = azurerm_resource_group.this.name
-}
-
 module "containerregistry" {
   source              = "Azure/avm-res-containerregistry-registry/azurerm"
-  name                = module.naming.container_registry.name_unique
+  name                = "ado-agents-acr"
   resource_group_name = azurerm_resource_group.this.name
   role_assignments = {
-    acrpull = {
+    acrpull_placeholder = {
       role_definition_id_or_name = "AcrPull"
-      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
+      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_placeholder_job.identity[0].principal_id
     }
+
+    acrpull_runner = {
+      role_definition_id_or_name = "AcrPull"
+      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_runner_job.identity[0].principal_id
+    }
+  }
+}
+
+# Build the sample container within our new ACR
+resource "terraform_data" "agent_container_image" {
+  triggers_replace = module.containerregistry.resource_id
+
+  provisioner "local-exec" {
+    command = <<COMMAND
+az acr build --registry ${module.containerregistry.resource.name} --image "${var.container_image_name}" --file "Dockerfile.azure-pipelines" "https://github.com/Azure-Samples/container-apps-ci-cd-runner-tutorial.git"
+COMMAND
   }
 }
 
 module "avm-ptn-cicd-agents-and-runners-ca" {
   source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  #source = "../.."
 
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned            = false
-    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+    system_assigned = true
   }
 
-  name                 = "ca-adoagent"
-  azp_pool_name        = "ca-adoagent-pool"
-  azp_url              = "https://dev.azure.com/my-organization"
-  container_image_name = "${module.containerregistry.resource.login_server}/azure-pipelines:latest"
-
-  virtual_network = azurerm_virtual_network.this_vnet
-  subnet = {
-    address_prefixes = ["10.0.2.0/23"]
-  }
+  name                            = "ca-adoagent"
+  azp_pool_name                   = "ca-adoagent-pool"
+  azp_url                         = var.ado_organization_url
   pat_token_value                 = var.personal_access_token
+  container_image_name            = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
+  log_analytics_workspace_id      = azurerm_log_analytics_workspace.this_workspace.id
   container_registry_login_server = module.containerregistry.resource.login_server
 
+  virtual_network_name                = azurerm_virtual_network.this_vnet.name
+  virtual_network_resource_group_name = azurerm_virtual_network.this_vnet.resource_group_name
+  subnet_address_prefix               = "10.0.2.0/23"
+
   enable_telemetry = var.enable_telemetry # see variables.tf
+
+  depends_on = [terraform_data.agent_container_image]
 }
 ```
 
