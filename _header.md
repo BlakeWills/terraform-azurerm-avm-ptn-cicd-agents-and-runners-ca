@@ -46,7 +46,7 @@ module "containerregistry" {
 }
 
 module "avm-ptn-cicd-agents-and-runners-ca" {
-  source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
 
   resource_group_name = azurerm_resource_group.this.name
 
@@ -62,12 +62,12 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 
   virtual_network = azurerm_virtual_network.this_vnet
   subnet = {
-    address_prefixes = ["10.0.2.0/23"]
+    address_prefixes = [ "10.0.2.0/23" ]
   }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
-  enable_telemetry = var.enable_telemetry # see variables.tf
+  enable_telemetry    = var.enable_telemetry # see variables.tf
 }
 ```
 
@@ -101,7 +101,7 @@ To enable tracing tags, set the `tracing_tags_enabled` variable to true:
 
 ```hcl
 module "avm-ptn-cicd-agents-and-runners-ca" {
-  source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
 
   resource_group_name = azurerm_resource_group.this.name
 
@@ -117,12 +117,12 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 
   virtual_network = azurerm_virtual_network.this_vnet
   subnet = {
-    address_prefixes = ["10.0.2.0/23"]
+    address_prefixes = [ "10.0.2.0/23" ]
   }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
-  enable_telemetry = var.enable_telemetry # see variables.tf
+  enable_telemetry    = var.enable_telemetry # see variables.tf
 
   tracing_tags_enabled = true
 }
@@ -134,7 +134,7 @@ To customize the prefix for your tracing tags, set the `tracing_tags_prefix` var
 
 ```hcl
 module "avm-ptn-cicd-agents-and-runners-ca" {
-  source = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
+  source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
 
   resource_group_name = azurerm_resource_group.this.name
 
@@ -150,12 +150,12 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 
   virtual_network = azurerm_virtual_network.this_vnet
   subnet = {
-    address_prefixes = ["10.0.2.0/23"]
+    address_prefixes = [ "10.0.2.0/23" ]
   }
   pat_token_value                 = var.personal_access_token
   container_registry_login_server = module.containerregistry.resource.login_server
 
-  enable_telemetry = var.enable_telemetry # see variables.tf
+  enable_telemetry    = var.enable_telemetry # see variables.tf
 
   tracing_tags_enabled = true
   tracing_tags_prefix  = "custom_prefix_"

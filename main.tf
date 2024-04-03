@@ -35,17 +35,43 @@ resource "azurerm_subnet" "ado_agents_subnet" {
 }
 
 resource "azurerm_container_app_environment" "ado_agent_container_app" {
-  location                       = data.azurerm_resource_group.parent.location
   name                           = coalesce(var.container_app_environment_name, "cae-${var.name}")
+  location                       = data.azurerm_resource_group.parent.location
   resource_group_name            = var.resource_group_name
-  infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
-  internal_load_balancer_enabled = true
-  log_analytics_workspace_id     = var.log_analytics_workspace_id
   zone_redundancy_enabled        = true
+  infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
+  log_analytics_workspace_id     = var.log_analytics_workspace_id
+  internal_load_balancer_enabled = true
 }
 
 resource "azapi_resource" "runner_job" {
-  type = "Microsoft.App/jobs@2023-05-01"
+  type      = "Microsoft.App/jobs@2023-05-01"
+  name      = coalesce(var.container_app_job_runner_name, "ca-runner-${var.name}")
+  location  = data.azurerm_resource_group.parent.location
+  parent_id = data.azurerm_resource_group.parent.id
+
+  lifecycle {
+    precondition {
+      condition     = local.container_registry_user_assigned_identity != null
+      error_message = "Unable to determine identity for authenticating to Azure Container Registry. Either specify `container_registry_user_assigned_identity` or configure a single identity."
+    }
+
+    precondition {
+      condition     = local.key_vault_user_assigned_identity != null
+      error_message = "Unable to determine identity for authenticating to Azure Key Vault. Either specify `key_vault_user_assigned_identity` or configure a single identity."
+    }
+
+    replace_triggered_by = [ azurerm_container_app_environment.ado_agent_container_app ]
+  }
+
+  dynamic "identity" {
+    for_each = local.managed_identities.system_assigned_user_assigned
+    content {
+      type         = identity.value.type
+      identity_ids = identity.value.user_assigned_resource_ids
+    }
+  }
+
   body = jsonencode({
     properties = {
       environmentId = azurerm_container_app_environment.ado_agent_container_app.id
@@ -123,8 +149,12 @@ resource "azapi_resource" "runner_job" {
       }
     }
   })
+}
+
+resource "azapi_resource" "placeholder_job" {
+  type      = "Microsoft.App/jobs@2023-05-01"
+  name      = coalesce(var.container_app_job_placeholder_name, "ca-placeholder-${var.name}")
   location  = data.azurerm_resource_group.parent.location
-  name      = coalesce(var.container_app_job_runner_name, "ca-runner-${var.name}")
   parent_id = data.azurerm_resource_group.parent.id
 
   dynamic "identity" {
@@ -136,21 +166,9 @@ resource "azapi_resource" "runner_job" {
   }
 
   lifecycle {
-    replace_triggered_by = [azurerm_container_app_environment.ado_agent_container_app]
-
-    precondition {
-      condition     = local.container_registry_user_assigned_identity != null
-      error_message = "Unable to determine identity for authenticating to Azure Container Registry. Either specify `container_registry_user_assigned_identity` or configure a single identity."
-    }
-    precondition {
-      condition     = local.key_vault_user_assigned_identity != null
-      error_message = "Unable to determine identity for authenticating to Azure Key Vault. Either specify `key_vault_user_assigned_identity` or configure a single identity."
-    }
+    replace_triggered_by = [ azurerm_container_app_environment.ado_agent_container_app ]
   }
-}
 
-resource "azapi_resource" "placeholder_job" {
-  type = "Microsoft.App/jobs@2023-05-01"
   body = jsonencode({
     properties = {
       environmentId = azurerm_container_app_environment.ado_agent_container_app.id
@@ -213,19 +231,4 @@ resource "azapi_resource" "placeholder_job" {
       }
     }
   })
-  location  = data.azurerm_resource_group.parent.location
-  name      = coalesce(var.container_app_job_placeholder_name, "ca-placeholder-${var.name}")
-  parent_id = data.azurerm_resource_group.parent.id
-
-  dynamic "identity" {
-    for_each = local.managed_identities.system_assigned_user_assigned
-    content {
-      type         = identity.value.type
-      identity_ids = identity.value.user_assigned_resource_ids
-    }
-  }
-
-  lifecycle {
-    replace_triggered_by = [azurerm_container_app_environment.ado_agent_container_app]
-  }
 }
