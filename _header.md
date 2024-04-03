@@ -162,17 +162,16 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 }
 ```
 
-# TODO: Where do we get these from?
 The actual applied tags would be:
 
 ```text
 {
-  custom_prefix_git_commit           = "0978238465c76c23be1b5998c1451519b4d135c9"
+  custom_prefix_git_commit           = "f2507b14218314d1fc8ce045727dcec2a1a80398"
   custom_prefix_git_file             = "main.tf"
-  custom_prefix_git_last_modified_at = "2023-07-01 10:37:24"
-  custom_prefix_git_org              = "Azure"
-  custom_prefix_git_repo             = "terraform-azurerm-avm-ptn-vnetgateway"
-  custom_prefix_yor_name             = "vgw"
-  custom_prefix_yor_trace            = "89805148-c9e6-4736-96bc-0f4095dfb135"
+  custom_prefix_git_last_modified_at = "2024-04-03 13:55:59"
+  custom_prefix_git_org              = "BlakeWills"
+  custom_prefix_git_repo             = "terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
+  custom_prefix_yor_name             = "ado_agent_container_app"
+  custom_prefix_yor_trace            = "e81b70e5-cfe9-4918-9685-57bc900c0d68"
 }
 ```

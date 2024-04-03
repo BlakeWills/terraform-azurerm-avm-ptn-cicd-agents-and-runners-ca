@@ -41,7 +41,16 @@ resource "azurerm_container_app_environment" "ado_agent_container_app" {
   infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
   internal_load_balancer_enabled = true
   log_analytics_workspace_id     = var.log_analytics_workspace_id
-  zone_redundancy_enabled        = true
+  tags = (/*<box>*/ (var.tracing_tags_enabled ? { for k, v in /*</box>*/ {
+    avm_git_commit           = "f2507b14218314d1fc8ce045727dcec2a1a80398"
+    avm_git_file             = "main.tf"
+    avm_git_last_modified_at = "2024-04-03 13:55:59"
+    avm_git_org              = "BlakeWills"
+    avm_git_repo             = "terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
+    avm_yor_name             = "ado_agent_container_app"
+    avm_yor_trace            = "e81b70e5-cfe9-4918-9685-57bc900c0d68"
+  } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/)
+  zone_redundancy_enabled = true
 }
 
 resource "azapi_resource" "runner_job" {
@@ -126,6 +135,7 @@ resource "azapi_resource" "runner_job" {
   location  = data.azurerm_resource_group.parent.location
   name      = coalesce(var.container_app_job_runner_name, "ca-runner-${var.name}")
   parent_id = data.azurerm_resource_group.parent.id
+  tags      = null
 
   dynamic "identity" {
     for_each = local.managed_identities.system_assigned_user_assigned
@@ -216,6 +226,7 @@ resource "azapi_resource" "placeholder_job" {
   location  = data.azurerm_resource_group.parent.location
   name      = coalesce(var.container_app_job_placeholder_name, "ca-placeholder-${var.name}")
   parent_id = data.azurerm_resource_group.parent.id
+  tags      = null
 
   dynamic "identity" {
     for_each = local.managed_identities.system_assigned_user_assigned
