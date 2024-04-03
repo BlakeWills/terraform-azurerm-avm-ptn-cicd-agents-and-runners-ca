@@ -256,35 +256,17 @@ Description: The resource group where the resources will be deployed.
 
 Type: `string`
 
-### <a name="input_subnet"></a> [subnet](#input\_subnet)
+### <a name="input_virtual_network_name"></a> [virtual\_network\_name](#input\_virtual\_network\_name)
 
-Description: The configuration for the Container App Environment subnet.:
-- `name`: Name of the subnet.
-- `address_prefixes`: List of valid CIDR blocks for the subnet. A consumption plan Container App Environment requires a /23 or larger.
-- `service_endpoints`: An optional list of service endpoints to add to the subnet.
+Description: The name of the Virtual Network.
 
-Type:
+Type: `string`
 
-```hcl
-object({
-    name = optional(string)
-    address_prefixes = list(string)
-    service_endpoints = optional(list(string))
-  })
-```
+### <a name="input_virtual_network_resource_group_name"></a> [virtual\_network\_resource\_group\_name](#input\_virtual\_network\_resource\_group\_name)
 
-### <a name="input_virtual_network"></a> [virtual\_network](#input\_virtual\_network)
+Description: The name of the Virtual Network's Resource Group.
 
-Description: Object defining the virtual network the container app environment subnet should be created within.
-
-Type:
-
-```hcl
-object({
-    name = string
-    resource_group_name = string
-  })
-```
+Type: `string`
 
 ## Optional Inputs
 
@@ -530,6 +512,38 @@ Description: The timeout in seconds for the runner Container Apps job.
 Type: `number`
 
 Default: `1800`
+
+### <a name="input_subnet_address_prefix"></a> [subnet\_address\_prefix](#input\_subnet\_address\_prefix)
+
+Description: The address prefix for the Container App Environment. Either subnet\_id or subnet\_name and subnet\_address\_prefix must be specified.
+
+Type: `string`
+
+Default: `""`
+
+### <a name="input_subnet_creation_enabled"></a> [subnet\_creation\_enabled](#input\_subnet\_creation\_enabled)
+
+Description: Whether or not to create a subnet for the Container App Environment.
+
+Type: `bool`
+
+Default: `true`
+
+### <a name="input_subnet_id"></a> [subnet\_id](#input\_subnet\_id)
+
+Description: The ID of a pre-existing gateway subnet to use for the Container App Environment. Either subnet\_id or subnet\_name and subnet\_address\_prefix must be specified.
+
+Type: `string`
+
+Default: `""`
+
+### <a name="input_subnet_name"></a> [subnet\_name](#input\_subnet\_name)
+
+Description: The subnet name for the Container App Environment. Either subnet\_id or subnet\_name and subnet\_address\_prefix must be specified.
+
+Type: `string`
+
+Default: `""`
 
 ### <a name="input_tags"></a> [tags](#input\_tags)
 

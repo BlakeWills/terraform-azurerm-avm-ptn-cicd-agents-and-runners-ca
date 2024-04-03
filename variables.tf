@@ -121,26 +121,42 @@ variable "log_analytics_workspace_id" {
   default = null
 }
 
-variable "virtual_network" {
-  type = object({
-    name = string
-    resource_group_name = string
-  })
-  description = "Object defining the virtual network the container app environment subnet should be created within."
+variable "virtual_network_name" {
+  type        = string
+  description = "The name of the Virtual Network."
 }
 
-variable "subnet" {
-  type = object({
-    name = optional(string)
-    address_prefixes = list(string)
-    service_endpoints = optional(list(string))
-  })
-  description = <<DESCRIPTION
-The configuration for the Container App Environment subnet.:
-- `name`: Name of the subnet.
-- `address_prefixes`: List of valid CIDR blocks for the subnet. A consumption plan Container App Environment requires a /23 or larger.
-- `service_endpoints`: An optional list of service endpoints to add to the subnet.
-DESCRIPTION
+variable "virtual_network_resource_group_name" {
+  type        = string
+  description = "The name of the Virtual Network's Resource Group."
+}
+
+variable "subnet_name" {
+  type        = string
+  default     = ""
+  description = "The subnet name for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
+  nullable    = false
+}
+
+variable "subnet_address_prefix" {
+  type        = string
+  default     = ""
+  description = "The address prefix for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
+  nullable    = false
+}
+
+variable "subnet_creation_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether or not to create a subnet for the Container App Environment."
+  nullable    = false
+}
+
+variable "subnet_id" {
+  type        = string
+  default     = ""
+  description = "The ID of a pre-existing gateway subnet to use for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
+  nullable    = false
 }
 
 variable "pat_token_secret_url" {

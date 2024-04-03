@@ -1,8 +1,10 @@
 locals {
   tags = {
-    scenario = "default"
+    scenario = "with_key_vault"
   }
 }
+
+data "azurerm_client_config" "this" {}
 
 terraform {
   required_version = ">= 1.3.0"
@@ -65,19 +67,56 @@ resource "azurerm_virtual_network" "this_vnet" {
   tags                = local.tags
 }
 
+resource "azurerm_user_assigned_identity" "example_identity" {
+  location            = azurerm_resource_group.this.location
+  name                = module.naming.user_assigned_identity.name_unique
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+}
+
+module "keyvault" {
+  source              = "Azure/avm-res-keyvault-vault/azurerm"
+  name                = module.naming.key_vault.name_unique
+  enable_telemetry    = var.enable_telemetry
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tenant_id           = data.azurerm_client_config.this.tenant_id
+
+  network_acls = null
+
+  secrets = {
+    pat-token = {
+      name = "pat-token"
+    }
+  }
+
+  secrets_value = {
+    pat-token = var.personal_access_token
+  }
+
+  role_assignments = {
+    # Required for container app environments to be able to read PAT token from KeyVault.
+    secrets_reader = {
+      role_definition_id_or_name = "Key Vault Secrets User"
+      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
+    },
+
+    # Required to set PAT token.
+    current_user = {
+      role_definition_id_or_name = "Key Vault Administrator"
+      principal_id               = data.azurerm_client_config.this.object_id
+    }
+  }
+}
+
 module "containerregistry" {
   source              = "Azure/avm-res-containerregistry-registry/azurerm"
   name                = module.naming.container_registry.name_unique
   resource_group_name = azurerm_resource_group.this.name
   role_assignments = {
-    acrpull_placeholder = {
+    acrpull = {
       role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_placeholder_job.identity[0].principal_id
-    }
-
-    acrpull_runner = {
-      role_definition_id_or_name = "AcrPull"
-      principal_id               = module.avm-ptn-cicd-agents-and-runners-ca.resource_runner_job.identity[0].principal_id
+      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
     }
   }
 }
@@ -104,13 +143,14 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   resource_group_name = azurerm_resource_group.this.name
 
   managed_identities = {
-    system_assigned = true
+    system_assigned            = false
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
   }
 
   name                            = "ca-adoagent"
   azp_pool_name                   = "ca-adoagent-pool"
   azp_url                         = var.ado_organization_url
-  pat_token_value                 = var.personal_access_token
+  pat_token_secret_url            = module.keyvault.resource_secrets["pat-token"].id
   container_image_name            = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
   log_analytics_workspace_id      = azurerm_log_analytics_workspace.this_workspace.id
   container_registry_login_server = module.containerregistry.resource.login_server

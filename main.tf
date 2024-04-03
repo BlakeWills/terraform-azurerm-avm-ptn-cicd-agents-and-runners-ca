@@ -26,11 +26,12 @@ resource "azurerm_role_assignment" "this" {
 
 # resources
 resource "azurerm_subnet" "ado_agents_subnet" {
-  address_prefixes     = var.subnet.address_prefixes
-  name                 = coalesce(var.subnet.name, "snet-${var.name}")
-  resource_group_name  = var.virtual_network.resource_group_name
-  virtual_network_name = var.virtual_network.name
-  service_endpoints    = var.subnet.service_endpoints
+  count = var.subnet_creation_enabled ? 1 : 0
+
+  address_prefixes     = [var.subnet_address_prefix]
+  name                 = coalesce(var.subnet_name, "snet-${var.name}")
+  resource_group_name  = var.virtual_network_resource_group_name
+  virtual_network_name = var.virtual_network_name
 }
 
 resource "azurerm_container_app_environment" "ado_agent_container_app" {
@@ -38,7 +39,7 @@ resource "azurerm_container_app_environment" "ado_agent_container_app" {
   location                       = data.azurerm_resource_group.parent.location
   resource_group_name            = var.resource_group_name
   zone_redundancy_enabled        = true
-  infrastructure_subnet_id       = azurerm_subnet.ado_agents_subnet.id
+  infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
   log_analytics_workspace_id     = var.log_analytics_workspace_id
   internal_load_balancer_enabled = true
 }
