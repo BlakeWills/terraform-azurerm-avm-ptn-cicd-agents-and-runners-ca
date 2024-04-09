@@ -176,7 +176,7 @@ resource "azapi_resource" "runner_job" {
     replace_triggered_by = [azurerm_container_app_environment.ado_agent_container_app]
 
     precondition {
-      condition     = local.key_vault_user_assigned_identity != null
+      condition     = var.pat_token_secret_url == null || local.key_vault_user_assigned_identity != null
       error_message = "Unable to determine identity for authenticating to Azure Key Vault. Either specify `key_vault_user_assigned_identity` or configure a single identity."
     }
   }

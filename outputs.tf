@@ -1,6 +1,7 @@
 output "resource" {
   description = "The container app environment."
   value       = azurerm_container_app_environment.ado_agent_container_app
+  sensitive   = true
 }
 
 output "resource_placeholder_job" {
