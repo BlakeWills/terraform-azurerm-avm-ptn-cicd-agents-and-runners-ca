@@ -1,5 +1,19 @@
-data "azurerm_resource_group" "parent" {
-  name = var.resource_group_name
+resource "azurerm_resource_group" "rg" {
+  count    = var.resource_group_creation_enabled ? 1 : 0
+  name     = coalesce(var.resource_group_name, "rg-${var.name}")
+  location = var.location
+
+  lifecycle {
+    precondition {
+      condition     = var.location != null
+      error_message = "location must be specified when resource_group_creation_enabled == true"
+    }
+  }
+}
+
+data "azurerm_resource_group" "rg" {
+  count = var.resource_group_creation_enabled ? 0 : 1
+  name  = var.resource_group_name
 }
 
 # required AVM resources interfaces
@@ -25,19 +39,35 @@ resource "azurerm_role_assignment" "this" {
 }
 
 # resources
+resource "azurerm_virtual_network" "ado_agents_vnet" {
+  count = var.virtual_network_creation_enabled ? 1 : 0
+
+  address_space       = [var.virtual_network_address_space]
+  location            = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
+  name                = coalesce(var.container_app_environment_name, "vnet-${var.name}")
+  resource_group_name = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
+}
+
+data "azurerm_virtual_network" "ado_agents_vnet" {
+  count = var.virtual_network_creation_enabled ? 0 : 1
+
+  name                = var.virtual_network_name
+  resource_group_name = var.virtual_network_resource_group_name
+}
+
 resource "azurerm_subnet" "ado_agents_subnet" {
   count = var.subnet_creation_enabled ? 1 : 0
 
   address_prefixes     = [var.subnet_address_prefix]
   name                 = coalesce(var.subnet_name, "snet-${var.name}")
-  resource_group_name  = var.virtual_network_resource_group_name
-  virtual_network_name = var.virtual_network_name
+  resource_group_name  = try(azurerm_virtual_network.ado_agents_vnet[0].resource_group_name, var.virtual_network_resource_group_name)
+  virtual_network_name = try(azurerm_virtual_network.ado_agents_vnet[0].name, var.virtual_network_name)
 }
 
 resource "azurerm_container_app_environment" "ado_agent_container_app" {
-  location                       = data.azurerm_resource_group.parent.location
+  location                       = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
   name                           = coalesce(var.container_app_environment_name, "cae-${var.name}")
-  resource_group_name            = var.resource_group_name
+  resource_group_name            = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
   infrastructure_subnet_id       = try(azurerm_subnet.ado_agents_subnet[0].id, var.subnet_id)
   internal_load_balancer_enabled = true
   log_analytics_workspace_id     = var.log_analytics_workspace_id
@@ -61,10 +91,7 @@ resource "azapi_resource" "runner_job" {
       configuration = {
         replicaRetryLimit = var.runner_replica_retry_limit
         replicaTimeout    = var.runner_replica_timeout
-        registries = [{
-          server   = var.container_registry_login_server
-          identity = local.container_registry_user_assigned_identity
-        }]
+        registries        = var.azure_container_registries
         eventTriggerConfig = {
           parallelism            = 1
           replicaCompletionCount = 1
@@ -132,9 +159,9 @@ resource "azapi_resource" "runner_job" {
       }
     }
   })
-  location  = data.azurerm_resource_group.parent.location
+  location  = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
   name      = coalesce(var.container_app_job_runner_name, "ca-runner-${var.name}")
-  parent_id = data.azurerm_resource_group.parent.id
+  parent_id = try(azurerm_resource_group.rg[0].id, data.azurerm_resource_group.rg[0].id)
   tags      = null
 
   dynamic "identity" {
@@ -148,10 +175,6 @@ resource "azapi_resource" "runner_job" {
   lifecycle {
     replace_triggered_by = [azurerm_container_app_environment.ado_agent_container_app]
 
-    precondition {
-      condition     = local.container_registry_user_assigned_identity != null
-      error_message = "Unable to determine identity for authenticating to Azure Container Registry. Either specify `container_registry_user_assigned_identity` or configure a single identity."
-    }
     precondition {
       condition     = local.key_vault_user_assigned_identity != null
       error_message = "Unable to determine identity for authenticating to Azure Key Vault. Either specify `key_vault_user_assigned_identity` or configure a single identity."
@@ -167,10 +190,7 @@ resource "azapi_resource" "placeholder_job" {
       configuration = {
         replicaRetryLimit = var.placeholder_replica_retry_limit
         replicaTimeout    = var.placeholder_replica_timeout
-        registries = [{
-          server   = var.container_registry_login_server
-          identity = local.container_registry_user_assigned_identity
-        }]
+        registries        = var.azure_container_registries
         manualTriggerConfig = {
           parallelism            = 1
           replicaCompletionCount = 1
@@ -223,9 +243,9 @@ resource "azapi_resource" "placeholder_job" {
       }
     }
   })
-  location  = data.azurerm_resource_group.parent.location
+  location  = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
   name      = coalesce(var.container_app_job_placeholder_name, "ca-placeholder-${var.name}")
-  parent_id = data.azurerm_resource_group.parent.id
+  parent_id = try(azurerm_resource_group.rg[0].id, data.azurerm_resource_group.rg[0].id)
   tags      = null
 
   dynamic "identity" {

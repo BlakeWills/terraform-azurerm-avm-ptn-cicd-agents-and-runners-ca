@@ -16,10 +16,18 @@ variable "container_image_name" {
   nullable    = false
 }
 
-variable "container_registry_login_server" {
-  type        = string
-  description = "Login server url for the Azure Container Registry hosting the image."
-  nullable    = false
+variable "azure_container_registries" {
+  type = set(object({
+    login_server = string
+    identity     = string
+  }))
+  nullable    = true
+  default     = null
+  description = <<DESCRIPTION
+A list of Azure Container Registries to link to the container app environment. Required values are:
+- `login_server` - The login server url for the Azure Container Registry.
+- `identity` - The id of the identity used to authenticate to the registry. For system managed identity, use 'System'.
+DESCRIPTION
 }
 
 variable "name" {
@@ -33,19 +41,17 @@ variable "name" {
 }
 
 # This is required for most resource modules
+variable "resource_group_creation_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether or not to create a resource group."
+}
+
 variable "resource_group_name" {
   type        = string
-  description = "The resource group where the resources will be deployed."
-}
-
-variable "virtual_network_name" {
-  type        = string
-  description = "The name of the Virtual Network."
-}
-
-variable "virtual_network_resource_group_name" {
-  type        = string
-  description = "The name of the Virtual Network's Resource Group."
+  default     = null
+  nullable    = true
+  description = "The resource group where the resources will be deployed. Must be specified if `resource_group_creation_enabled == false`"
 }
 
 variable "container_app_environment_name" {
@@ -64,15 +70,6 @@ variable "container_app_job_runner_name" {
   type        = string
   default     = null
   description = "The name of the Container App runner job."
-}
-
-variable "container_registry_user_assigned_identity" {
-  type        = string
-  default     = null
-  description = <<DESCRIPTION
-The user assigned identity to use to authenticate with Azure container registry.
-Must be specified if multiple user assigned are specified in `managed_identities`.
-DESCRIPTION
 }
 
 variable "enable_telemetry" {
@@ -97,7 +94,7 @@ DESCRIPTION
 variable "location" {
   type        = string
   default     = null
-  description = "Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
+  description = "Azure region where the resource should be deployed. Must be specified if `resource_group_creation_enabled == true`."
 }
 
 variable "lock" {
@@ -263,7 +260,7 @@ variable "subnet_creation_enabled" {
 variable "subnet_id" {
   type        = string
   default     = ""
-  description = "The ID of a pre-existing gateway subnet to use for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
+  description = "The ID of a pre-existing subnet to use for the Container App Environment. Either subnet_id or subnet_name and subnet_address_prefix must be specified."
   nullable    = false
 }
 
@@ -299,4 +296,39 @@ variable "tracing_tags_prefix" {
   default     = "avm_"
   description = "Default prefix for generated tracing tags"
   nullable    = false
+}
+
+variable "virtual_network_address_space" {
+  type        = string
+  default     = ""
+  description = "The address range for the Container App Environment virtual network. Either virtual_network_id or virtual_network_name and virtual_network_address_range must be specified."
+  nullable    = false
+}
+
+variable "virtual_network_creation_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether or not to create a virtual network for the Container App Environment."
+  nullable    = false
+}
+
+variable "virtual_network_id" {
+  type        = string
+  default     = ""
+  description = "The ID of a pre-existing virtual network to use for the Container App Environment. Either virtual_network_id or virtual_network_name and virtual_network_address_range must be specified."
+  nullable    = false
+}
+
+variable "virtual_network_name" {
+  type        = string
+  default     = ""
+  description = "The virtual network name for the Container App Environment. Either virtual_network_id or virtual_network_name and virtual_network_address_range must be specified."
+  nullable    = false
+}
+
+variable "virtual_network_resource_group_name" {
+  type        = string
+  default     = ""
+  nullable    = false
+  description = "The name of the Virtual Network's Resource Group. Must be specified if `virtual_network_creation_enabled` == `false`"
 }

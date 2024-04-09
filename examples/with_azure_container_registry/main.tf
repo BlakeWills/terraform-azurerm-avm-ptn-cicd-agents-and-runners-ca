@@ -1,6 +1,6 @@
 locals {
   tags = {
-    scenario = "with_key_vault"
+    scenario = "azure_container_registry"
   }
 }
 
@@ -21,8 +21,6 @@ terraform {
 provider "azurerm" {
   features {}
 }
-
-data "azurerm_client_config" "this" {}
 
 ## Section to provide a random Azure region for the resource group
 # This allows us to randomize the region for the resource group.
@@ -50,45 +48,33 @@ resource "azurerm_resource_group" "this" {
   tags     = local.tags
 }
 
-resource "azurerm_user_assigned_identity" "example_identity" {
+resource "azurerm_user_assigned_identity" "this_identity" {
   location            = azurerm_resource_group.this.location
   name                = module.naming.user_assigned_identity.name_unique
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
 }
 
-module "keyvault" {
-  source              = "Azure/avm-res-keyvault-vault/azurerm"
-  name                = module.naming.key_vault.name_unique
-  enable_telemetry    = var.enable_telemetry
-  location            = azurerm_resource_group.this.location
+module "containerregistry" {
+  source              = "Azure/avm-res-containerregistry-registry/azurerm"
+  name                = module.naming.container_registry.name_unique
   resource_group_name = azurerm_resource_group.this.name
-  tenant_id           = data.azurerm_client_config.this.tenant_id
-
-  network_acls = null
-
-  secrets = {
-    pat-token = {
-      name = "pat-token"
-    }
-  }
-
-  secrets_value = {
-    pat-token = var.personal_access_token
-  }
-
   role_assignments = {
-    # Required for container app environments to be able to read PAT token from KeyVault.
-    secrets_reader = {
-      role_definition_id_or_name = "Key Vault Secrets User"
-      principal_id               = azurerm_user_assigned_identity.example_identity.principal_id
-    },
-
-    # Required to set PAT token.
-    current_user = {
-      role_definition_id_or_name = "Key Vault Administrator"
-      principal_id               = data.azurerm_client_config.this.object_id
+    acrpull = {
+      role_definition_id_or_name = "AcrPull"
+      principal_id               = azurerm_user_assigned_identity.this_identity.principal_id
     }
+  }
+}
+
+# Build the sample container within our new ACR
+resource "terraform_data" "agent_container_image" {
+  triggers_replace = module.containerregistry.resource_id
+
+  provisioner "local-exec" {
+    command = <<COMMAND
+az acr build --registry ${module.containerregistry.resource.name} --image "${var.container_image_name}" --file "Dockerfile.azure-pipelines" "https://github.com/Azure-Samples/container-apps-ci-cd-runner-tutorial.git"
+COMMAND
   }
 }
 
@@ -105,16 +91,22 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 
   managed_identities = {
     system_assigned            = false
-    user_assigned_resource_ids = [azurerm_user_assigned_identity.example_identity.id]
+    user_assigned_resource_ids = [azurerm_user_assigned_identity.this_identity.id]
   }
 
   name                          = module.naming.container_app.name_unique
   azp_pool_name                 = "ca-adoagent-pool"
   azp_url                       = var.ado_organization_url
-  pat_token_secret_url          = module.keyvault.resource_secrets["pat-token"].id
-  container_image_name          = "microsoftavm/azure-devops-agent"
-  subnet_address_prefix         = "10.0.2.0/23"
+  pat_token_value               = var.personal_access_token
+  container_image_name          = "${module.containerregistry.resource.login_server}/${var.container_image_name}"
   virtual_network_address_space = "10.0.0.0/16"
+  subnet_address_prefix         = "10.0.2.0/23"
 
+  azure_container_registries = [{
+    login_server = module.containerregistry.resource.login_server,
+    identity     = azurerm_user_assigned_identity.this_identity.principal_id
+  }]
+
+  depends_on       = [terraform_data.agent_container_image]
   enable_telemetry = var.enable_telemetry # see variables.tf
 }
