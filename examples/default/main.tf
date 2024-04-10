@@ -43,9 +43,6 @@ module "naming" {
 }
 
 # This is the module call
-# Do not specify location here due to the randomization above.
-# Leaving location as `null` will cause the module to use the resource group location
-# with a data source.
 module "avm-ptn-cicd-agents-and-runners-ca" {
   source = "../.."
   # source             = "Azure/avm-ptn-cicd-agents-and-runners-ca/azurerm"
@@ -62,6 +59,7 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   container_image_name          = "microsoftavm/azure-devops-agent:1.1.0"
   subnet_address_prefix         = "10.0.2.0/23"
   virtual_network_address_space = "10.0.0.0/16"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this_workspace.id
 
   enable_telemetry = var.enable_telemetry # see variables.tf
 }
