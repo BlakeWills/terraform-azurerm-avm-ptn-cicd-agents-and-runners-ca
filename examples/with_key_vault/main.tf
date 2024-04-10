@@ -112,7 +112,7 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   azp_pool_name                 = "ca-adoagent-pool"
   azp_url                       = var.ado_organization_url
   pat_token_secret_url          = module.keyvault.resource_secrets["pat-token"].id
-  container_image_name          = "microsoftavm/azure-devops-agent"
+  container_image_name          = "microsoftavm/azure-devops-agent:1.1.0"
   subnet_address_prefix         = "10.0.2.0/23"
   virtual_network_address_space = "10.0.0.0/16"
 

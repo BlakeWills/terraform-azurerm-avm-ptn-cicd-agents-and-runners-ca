@@ -2,9 +2,7 @@ provider "azurerm" {
   features {}
 }
 
-run "examples_default" {
-  command = plan
-
+run "default" {
   variables {
     personal_access_token = "my-really-secure-token"
     ado_organization_url  = "https://dev.azure.com/my-org"
@@ -15,9 +13,7 @@ run "examples_default" {
   }
 }
 
-run "examples_with_azure_container_registry" {
-  command = plan
-
+run "with_azure_container_registry" {
   variables {
     personal_access_token = "my-really-secure-token"
     ado_organization_url  = "https://dev.azure.com/my-org"
@@ -28,9 +24,7 @@ run "examples_with_azure_container_registry" {
   }
 }
 
-run "examples_with_key_vault" {
-  command = plan
-
+run "with_key_vault" {
   variables {
     personal_access_token = "my-really-secure-token"
     ado_organization_url  = "https://dev.azure.com/my-org"

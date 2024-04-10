@@ -44,7 +44,7 @@ resource "azurerm_virtual_network" "ado_agents_vnet" {
 
   address_space       = [var.virtual_network_address_space]
   location            = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
-  name                = coalesce(var.container_app_environment_name, "vnet-${var.name}")
+  name                = coalesce(var.virtual_network_name, "vnet-${var.name}")
   resource_group_name = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
 }
 
@@ -258,5 +258,10 @@ resource "azapi_resource" "placeholder_job" {
 
   lifecycle {
     replace_triggered_by = [azurerm_container_app_environment.ado_agent_container_app]
+
+    precondition {
+      condition     = var.pat_token_secret_url == null || local.key_vault_user_assigned_identity != null
+      error_message = "Unable to determine identity for authenticating to Azure Key Vault. Either specify `key_vault_user_assigned_identity` or configure a single identity."
+    }
   }
 }
