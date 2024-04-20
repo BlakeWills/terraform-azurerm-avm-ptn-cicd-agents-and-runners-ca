@@ -1,15 +1,15 @@
 output "resource" {
   description = "The container app environment."
-  value       = azurerm_container_app_environment.ado_agent_container_app
+  value       = try(module.ca_ado[0].resource, module.ca_github[0].resource)
   sensitive   = true
 }
 
 output "resource_placeholder_job" {
   description = "The placeholder job."
-  value       = azapi_resource.placeholder_job
+  value       = try(module.ca_ado[0].resource_placeholder_job, null)
 }
 
 output "resource_runner_job" {
   description = "The runner job."
-  value       = azapi_resource.runner_job
+  value       = try(module.ca_ado[0].resource_runner_job, module.ca_github[0].resource_runner_job)
 }
