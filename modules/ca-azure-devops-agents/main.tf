@@ -22,7 +22,7 @@ resource "azurerm_role_assignment" "this" {
 
 # resources
 data "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
+  name = var.resource_group_name
 }
 
 resource "azurerm_container_app_environment" "this_ca_environment" {
@@ -86,6 +86,10 @@ resource "azapi_resource" "runner_job" {
             value       = var.pat_token_value
             identity    = var.pat_token_value != null ? null : local.key_vault_user_assigned_identity
             keyVaultUrl = var.pat_token_value != null ? null : var.pat_token_secret_url
+          },
+          {
+            name  = "organization-url"
+            value = var.azp_url
           }
         ]
         triggerType = "Event"

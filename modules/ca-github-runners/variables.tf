@@ -2,7 +2,7 @@ variable "github_runner_scope" {
   type        = string
   description = "The scope of the runner"
   validation {
-    condition     = contains(["org", "ent", "repo"], coalesce(var.github_runner_scope, ""))
+    condition     = contains(["org", "ent", "repo"], var.github_runner_scope)
     error_message = "github_runner_scope must be one of 'org', 'ent', or 'repo'"
   }
 }

@@ -56,7 +56,7 @@ resource "azurerm_log_analytics_workspace" "this_laws" {
 module "ca_ado" {
   source = "./modules/ca-azure-devops-agents"
 
-  count = var.cicd_system == "AzureDevOps" ? 1 : 0
+  count = lower(var.cicd_system) == "azuredevops" ? 1 : 0
 
   resource_group_name                = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
   resource_group_location            = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
@@ -82,7 +82,7 @@ module "ca_ado" {
   container_app_job_runner_name      = var.container_app_job_runner_name
   min_execution_count                = var.min_execution_count
   max_execution_count                = var.max_execution_count
-  subnet_id                          = try(azurerm_subnet.this_subnet[0].name, var.subnet_id)
+  subnet_id                          = try(azurerm_subnet.this_subnet[0].id, var.subnet_id)
   virtual_network_id                 = try(azurerm_virtual_network.this_vnet[0].id, data.azurerm_virtual_network.this_vnet[0].id)
   tracing_tags_enabled               = var.tracing_tags_enabled
   tracing_tags_prefix                = var.tracing_tags_prefix
@@ -98,7 +98,7 @@ module "ca_ado" {
 module "ca_github" {
   source = "./modules/ca-github-runners"
 
-  count = var.cicd_system == "GitHub" ? 1 : 0
+  count = lower(var.cicd_system) == "github" ? 1 : 0
 
   resource_group_name              = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
   resource_group_location          = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
@@ -121,7 +121,7 @@ module "ca_github" {
   container_app_job_runner_name    = var.container_app_job_runner_name
   min_execution_count              = var.min_execution_count
   max_execution_count              = var.max_execution_count
-  subnet_id                        = try(azurerm_subnet.this_subnet[0].name, var.subnet_id)
+  subnet_id                        = try(azurerm_subnet.this_subnet[0].id, var.subnet_id)
   virtual_network_id               = try(azurerm_virtual_network.this_vnet[0].id, data.azurerm_virtual_network.this_vnet[0].id)
   tracing_tags_enabled             = var.tracing_tags_enabled
   tracing_tags_prefix              = var.tracing_tags_prefix

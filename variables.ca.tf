@@ -137,7 +137,7 @@ variable "cicd_system" {
   default     = false
   description = "The name of the CI/CD system to deploy the agents too. Allowed values are 'AzureDevOps' or 'Github'"
   validation {
-    condition     = contains(["AzureDevOps", "Github"], var.cicd_system)
+    condition     = contains(["azuredevops", "github"], lower(var.cicd_system))
     error_message = "cicd_system must be one of 'AzureDevOps' or 'Github'"
   }
 }

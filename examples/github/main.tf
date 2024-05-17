@@ -59,8 +59,9 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   subnet_address_prefix         = "10.0.2.0/23"
   virtual_network_address_space = "10.0.0.0/16"
 
-  github_owner = "BlakeWills"
-  github_repos = ["terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"]
+  github_owner        = "BlakeWills"
+  github_runner_scope = "repo"
+  github_repos        = ["terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"]
 
   enable_telemetry = var.enable_telemetry # see variables.tf
 }
