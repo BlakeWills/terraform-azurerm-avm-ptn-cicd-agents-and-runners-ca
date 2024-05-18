@@ -103,12 +103,11 @@ module "ca_github" {
   resource_group_name              = try(azurerm_resource_group.rg[0].name, data.azurerm_resource_group.rg[0].name)
   resource_group_location          = try(azurerm_resource_group.rg[0].location, data.azurerm_resource_group.rg[0].location)
   name                             = var.name
-  github_api_url                   = var.github_api_url
-  github_owner                     = var.github_owner
-  github_repos                     = var.github_repos
-  github_runner_scope              = var.github_runner_scope
+  github_keda_metadata             = var.github_keda_metadata
   pat_token_secret_url             = var.pat_token_secret_url
   pat_token_value                  = var.pat_token_value
+  pat_env_var_name                 = var.pat_env_var_name
+  environment_variables            = var.environment_variables
   polling_interval_seconds         = var.polling_interval_seconds
   runner_agent_cpu                 = var.runner_agent_cpu
   runner_agent_memory              = var.runner_agent_memory

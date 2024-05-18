@@ -59,9 +59,23 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
   subnet_address_prefix         = "10.0.2.0/23"
   virtual_network_address_space = "10.0.0.0/16"
 
-  github_owner        = "BlakeWills"
-  github_runner_scope = "repo"
-  github_repos        = ["terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"]
+  github_keda_metadata = {
+    owner       = "BlakeWills"
+    runnerScope = "repo"
+    repos       = join(",", ["terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"])
+  }
+
+  pat_env_var_name = "GH_RUNNER_TOKEN"
+  environment_variables = [
+    {
+      name  = "GH_RUNNER_URL",
+      value = "https://github.com/BlakeWills/terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
+    },
+    {
+      name  = "GH_RUNNER_NAME"
+      value = "container-app-agent"
+    }
+  ]
 
   enable_telemetry = var.enable_telemetry # see variables.tf
 }

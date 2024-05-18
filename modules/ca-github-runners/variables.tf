@@ -1,23 +1,27 @@
-variable "github_runner_scope" {
-  type        = string
-  description = "The scope of the runner"
-  validation {
-    condition     = contains(["org", "ent", "repo"], var.github_runner_scope)
-    error_message = "github_runner_scope must be one of 'org', 'ent', or 'repo'"
-  }
+variable "github_keda_metadata" {
+  type = object({
+    githubAPIURL              = optional(string, "https://api.github.com")
+    owner                     = string
+    runnerScope               = string
+    repos                     = optional(string)
+    labels                    = optional(set(string))
+    targetWorkflowQueueLength = optional(string, "1")
+    applicationID             = optional(string)
+    installationID            = optional(string)
+  })
 }
 
-variable "github_api_url" {
-  type        = string
-  description = "The URL of the GitHub API, defaults to https://api.github.com. You should only need to modify this if you have your own GitHub Appliance."
+variable "environment_variables" {
+  type = set(object({
+    name  = string
+    value = string
+  }))
+  description = "List of environment variables to pass to the container."
 }
 
-variable "github_owner" {
+variable "pat_env_var_name" {
   type        = string
-  description = "The owner of the GitHub repository, or the organization that owns the repository"
-}
-
-variable "github_repos" {
-  type        = set(string)
-  description = "The list of repositories to scale"
+  nullable    = true
+  default     = "GH_RUNNER_TOKEN"
+  description = "Name of the PAT token environment variable. Defaults to 'GH_RUNNER_TOKEN'."
 }

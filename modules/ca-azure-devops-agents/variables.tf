@@ -32,3 +32,10 @@ variable "placeholder_replica_timeout" {
   type        = number
   description = "The timeout in seconds for the placeholder Container Apps job."
 }
+
+variable "pat_env_var_name" {
+  type        = string
+  nullable    = true
+  default     = "AZP_TOKEN"
+  description = "Name of the PAT token environment variable. Defaults to 'AZP_TOKEN'."
+}

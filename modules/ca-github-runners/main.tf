@@ -43,10 +43,10 @@ resource "azurerm_container_app_environment" "this_ca_environment" {
   } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/)
   zone_redundancy_enabled = true
 }
-
+# todo: remove non-sensitive
 resource "azapi_resource" "runner_job" {
   type = "Microsoft.App/jobs@2023-05-01"
-  body = jsonencode({
+  body = nonsensitive(jsonencode({
     properties = {
       environmentId = azurerm_container_app_environment.this_ca_environment.id
       configuration = {
@@ -61,15 +61,9 @@ resource "azapi_resource" "runner_job" {
             maxExecutions   = var.max_execution_count
             pollingInterval = var.polling_interval_seconds
             rules = [{
-              name = "github-runner"
-              type = "github-runner"
-              metadata = {
-                githubAPIURL              = var.github_api_url
-                owner                     = var.github_owner
-                runnerScope               = var.github_runner_scope
-                repos                     = join(",", var.github_repos)
-                targetWorkflowQueueLength = tostring(var.target_queue_length)
-              }
+              name     = "github-runner"
+              type     = "github-runner"
+              metadata = var.github_keda_metadata
               auth = [
                 {
                   secretRef        = "personal-access-token",
@@ -97,24 +91,16 @@ resource "azapi_resource" "runner_job" {
             cpu    = var.runner_agent_cpu
             memory = var.runner_agent_memory
           }
-          env = [
+          env = concat(tolist(var.environment_variables), tolist([
             {
-              name      = "GITHUB_PAT"
+              name      = var.pat_env_var_name
               secretRef = "personal-access-token"
-            },
-            {
-              name  = "GH_URL",
-              value = "https://github.com/$REPO_OWNER/$REPO_NAME" # todo
-            },
-            {
-              name  = "REGISTRATION_TOKEN_API_URL",
-              value = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/actions/runners/registration-token" # todo
             }
-          ]
+          ]))
         }]
       }
     }
-  })
+  }))
   location  = data.azurerm_resource_group.rg.location
   name      = coalesce(var.container_app_job_runner_name, "ca-runner-${var.name}")
   parent_id = data.azurerm_resource_group.rg.id
