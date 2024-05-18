@@ -99,7 +99,7 @@ module "avm-ptn-cicd-agents-and-runners-ca" {
 We're using [BridgeCrew Yor](https://github.com/bridgecrewio/yor) and [yorbox](https://github.com/lonegunmanb/yorbox) to help manage tags consistently across infrastructure as code (IaC) frameworks. This adds accountability for the code responsible for deploying the particular Azure resources. In this module you might see tags like:
 
 ```hcl
-resource "azurerm_container_app_environment" "ado_agent_container_app" {
+resource "azurerm_container_app_environment" "this_ca_environment" {
   location                       = data.azurerm_resource_group.parent.location
   name                           = coalesce(var.container_app_environment_name, "cae-${var.name}")
   resource_group_name            = var.resource_group_name
@@ -112,7 +112,7 @@ resource "azurerm_container_app_environment" "ado_agent_container_app" {
     avm_git_last_modified_at = "2024-04-03 13:55:59"
     avm_git_org              = "BlakeWills"
     avm_git_repo             = "terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
-    avm_yor_name             = "ado_agent_container_app"
+    avm_yor_name             = "this_ca_environment"
     avm_yor_trace            = "e81b70e5-cfe9-4918-9685-57bc900c0d68"
   } /*<box>*/ : replace(k, "avm_", var.tracing_tags_prefix) => v } : {}) /*</box>*/)
   zone_redundancy_enabled = true
@@ -195,7 +195,7 @@ The actual applied tags would be:
   custom_prefix_git_last_modified_at = "2024-04-03 13:55:59"
   custom_prefix_git_org              = "BlakeWills"
   custom_prefix_git_repo             = "terraform-azurerm-avm-ptn-cicd-agents-and-runners-ca"
-  custom_prefix_yor_name             = "ado_agent_container_app"
+  custom_prefix_yor_name             = "this_ca_environment"
   custom_prefix_yor_trace            = "e81b70e5-cfe9-4918-9685-57bc900c0d68"
 }
 ```

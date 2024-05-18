@@ -91,7 +91,7 @@ run "disable_resource_creation" {
 
   # Subnet should not be created
   assert {
-    condition     = azurerm_container_app_environment.ado_agent_container_app.infrastructure_subnet_id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.Network/virtualNetworks/my-vnet/subnets/my-subnet"
+    condition     = azurerm_container_app_environment.this_ca_environment.infrastructure_subnet_id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.Network/virtualNetworks/my-vnet/subnets/my-subnet"
     error_message = "infrastructure_subnet_id should match provided subnet id"
   }
 }
